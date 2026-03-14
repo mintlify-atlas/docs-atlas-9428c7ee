@@ -1,0 +1,496 @@
+---
+title: Reaction
+description: Represents a reaction to a message
+---
+
+## Overview
+
+The `Reaction` class represents a reaction to a message in Fluxer. Reactions allow users to respond to messages with emojis (unicode or custom). This page also covers `PartialEmoji` and raw reaction events.
+
+## Reaction Class
+
+```python
+from fluxer.models import Reaction
+
+@dataclass(slots=True)
+class Reaction:
+    """Represents a reaction to a message."""
+```
+
+### Properties
+
+<ResponseField name="emoji" type="PartialEmoji" required>
+  The emoji used for this reaction
+</ResponseField>
+
+<ResponseField name="count" type="int" default="0">
+  Number of times this reaction was made
+</ResponseField>
+
+<ResponseField name="me" type="bool" default="False">
+  Whether the current user reacted with this emoji
+</ResponseField>
+
+<ResponseField name="message" type="Message | None">
+  The message this reaction is attached to (computed property)
+</ResponseField>
+
+### Methods
+
+#### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    message: Message | None = None,
+) -> Reaction
+```
+
+Create a Reaction from API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw reaction object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+<ParamField path="message" type="Message | None">
+  The message this reaction belongs to
+</ParamField>
+
+#### remove
+
+```python
+async def remove(user: User | int | str) -> None
+```
+
+Remove this reaction from a specific user.
+
+<ParamField path="user" type="User | int | str" required>
+  The user or user ID to remove the reaction from
+</ParamField>
+
+**Example:**
+```python
+# Remove a specific user's reaction
+await reaction.remove(user_id)
+
+# Remove your own reaction
+await reaction.remove("@me")
+```
+
+#### clear
+
+```python
+async def clear() -> None
+```
+
+Remove all instances of this reaction from the message.
+
+**Example:**
+```python
+# Clear all reactions of this emoji
+await reaction.clear()
+```
+
+## PartialEmoji Class
+
+```python
+from fluxer.models import PartialEmoji
+
+@dataclass(slots=True)
+class PartialEmoji:
+    """Represents a partial emoji (used in reactions)."""
+```
+
+### Properties
+
+<ResponseField name="name" type="str | None">
+  The emoji name (or unicode character)
+</ResponseField>
+
+<ResponseField name="id" type="int | None">
+  The emoji ID (only for custom emojis)
+</ResponseField>
+
+<ResponseField name="animated" type="bool" default="False">
+  Whether the emoji is animated (only for custom emojis)
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="is_unicode_emoji" type="bool">
+  Whether this is a unicode emoji (vs custom emoji)
+  
+  ```python
+  if emoji.is_unicode_emoji:
+      print("Standard emoji")
+  ```
+</ResponseField>
+
+<ResponseField name="is_custom_emoji" type="bool">
+  Whether this is a custom emoji
+  
+  ```python
+  if emoji.is_custom_emoji:
+      print(f"Custom emoji ID: {emoji.id}")
+  ```
+</ResponseField>
+
+### Methods
+
+#### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any]) -> PartialEmoji
+```
+
+Create a PartialEmoji from gateway data.
+
+**String Representation:**
+
+```python
+print(str(emoji))  # Unicode: 👍 or Custom: <:name:id>
+```
+
+## Raw Reaction Events
+
+### RawReactionActionEvent
+
+Represents a raw reaction add/remove event from the gateway. This event is dispatched even when the message is not in cache.
+
+```python
+@dataclass(slots=True)
+class RawReactionActionEvent:
+    message_id: int
+    channel_id: int
+    guild_id: int | None
+    user_id: int
+    emoji: PartialEmoji
+    event_type: str  # "REACTION_ADD" or "REACTION_REMOVE"
+```
+
+### RawReactionClearEvent
+
+Represents a raw reaction clear event (all reactions removed from a message).
+
+```python
+@dataclass(slots=True)
+class RawReactionClearEvent:
+    message_id: int
+    channel_id: int
+    guild_id: int | None
+```
+
+### RawReactionClearEmojiEvent
+
+Represents a raw reaction clear emoji event (all reactions of a specific emoji removed).
+
+```python
+@dataclass(slots=True)
+class RawReactionClearEmojiEvent:
+    message_id: int
+    channel_id: int
+    guild_id: int | None
+    emoji: PartialEmoji
+```
+
+## Usage Examples
+
+### Basic Reaction Handling
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!react":
+        # Add multiple reactions
+        await message.add_reaction("👍")  # Thumbs up
+        await message.add_reaction("❤️")  # Heart
+        await message.add_reaction("🎉")  # Party
+
+client.run()
+```
+
+### Reaction-Based Voting
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!poll"):
+        # Extract poll question
+        question = message.content[6:].strip() or "Vote!"
+        
+        # Create poll message
+        embed = Embed(
+            title="Poll",
+            description=question,
+            color=0x5865F2
+        )
+        embed.set_footer(text="React to vote!")
+        
+        poll_msg = await message.channel.send(embed=embed)
+        
+        # Add reaction options
+        await poll_msg.add_reaction("👍")  # Yes
+        await poll_msg.add_reaction("👎")  # No
+        await poll_msg.add_reaction("🤷")  # Maybe
+
+@client.event
+async def on_reaction_add(reaction, user):
+    """Handle when a user adds a reaction."""
+    if user.bot:
+        return
+    
+    print(f"{user.display_name} reacted with {reaction.emoji}")
+    print(f"This emoji now has {reaction.count} reactions")
+
+client.run()
+```
+
+### Reaction Role System
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+# Map emojis to role IDs
+REACTION_ROLES = {
+    "🟥": 123456789,  # Red emoji -> Red role
+    "🟦": 987654321,  # Blue emoji -> Blue role
+    "🟩": 555555555,  # Green emoji -> Green role
+}
+
+@client.event
+async def on_reaction_add(reaction, user):
+    """Assign roles based on reactions."""
+    if user.bot:
+        return
+    
+    # Check if this is a reaction role message
+    emoji_str = str(reaction.emoji)
+    if emoji_str in REACTION_ROLES:
+        role_id = REACTION_ROLES[emoji_str]
+        
+        # Fetch member and add role
+        if reaction.message.guild_id:
+            guild = await client.fetch_guild(reaction.message.guild_id)
+            member = await guild.fetch_member(user.id)
+            await member.add_role(role_id, reason="Reaction role")
+            print(f"Added role {role_id} to {user.display_name}")
+
+@client.event
+async def on_reaction_remove(reaction, user):
+    """Remove roles when reactions are removed."""
+    if user.bot:
+        return
+    
+    emoji_str = str(reaction.emoji)
+    if emoji_str in REACTION_ROLES:
+        role_id = REACTION_ROLES[emoji_str]
+        
+        if reaction.message.guild_id:
+            guild = await client.fetch_guild(reaction.message.guild_id)
+            member = await guild.fetch_member(user.id)
+            await member.remove_role(role_id, reason="Reaction role removed")
+            print(f"Removed role {role_id} from {user.display_name}")
+
+client.run()
+```
+
+### Reaction Statistics
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!reactions"):
+        # Get reaction info for a message
+        parts = message.content.split()
+        if len(parts) >= 2:
+            msg_id = int(parts[1])
+            msg = await message.channel.fetch_message(msg_id)
+            
+            if not msg.reactions:
+                await message.reply("That message has no reactions.")
+                return
+            
+            embed = Embed(
+                title="Reaction Statistics",
+                description=f"Message: {msg_id}",
+                color=0x5865F2
+            )
+            
+            for reaction in msg.reactions:
+                embed.add_field(
+                    name=str(reaction.emoji),
+                    value=f"Count: {reaction.count}\nYou: {'Yes' if reaction.me else 'No'}",
+                    inline=True
+                )
+            
+            await message.reply(embed=embed)
+
+client.run()
+```
+
+### Clear Reactions Command
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!clearreactions"):
+        parts = message.content.split()
+        if len(parts) >= 2:
+            msg_id = int(parts[1])
+            msg = await message.channel.fetch_message(msg_id)
+            
+            # Clear all reactions
+            await msg.clear_reactions()
+            await message.reply("Cleared all reactions!")
+    
+    elif message.content.startswith("!clearemoji"):
+        # Clear specific emoji reactions
+        # Format: !clearemoji <message_id> <emoji>
+        parts = message.content.split()
+        if len(parts) >= 3:
+            msg_id = int(parts[1])
+            emoji = parts[2]
+            
+            msg = await message.channel.fetch_message(msg_id)
+            await msg.clear_reaction(emoji)
+            await message.reply(f"Cleared {emoji} reactions!")
+
+client.run()
+```
+
+### Custom Emoji Reactions
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!customreact":
+        if not message.guild_id:
+            return
+        
+        # Fetch guild emojis
+        guild = await client.fetch_guild(message.guild_id)
+        emojis = await guild.fetch_emojis()
+        
+        # Add reactions with custom emojis
+        for emoji in emojis[:5]:  # First 5 emojis
+            await message.add_reaction(str(emoji))
+
+client.run()
+```
+
+### Reaction Leaderboard
+
+```python
+import fluxer
+from fluxer import Embed
+from collections import defaultdict
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!topreactions":
+        # Fetch recent messages and count reactions
+        messages = await message.channel.fetch_messages(limit=100)
+        
+        emoji_counts = defaultdict(int)
+        for msg in messages:
+            for reaction in msg.reactions:
+                emoji_counts[str(reaction.emoji)] += reaction.count
+        
+        # Sort by count
+        top_emojis = sorted(
+            emoji_counts.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:10]
+        
+        if not top_emojis:
+            await message.reply("No reactions found in recent messages.")
+            return
+        
+        embed = Embed(
+            title="Top Reactions (Last 100 Messages)",
+            color=0x5865F2
+        )
+        
+        leaderboard = "\n".join([
+            f"{i+1}. {emoji} - {count} reactions"
+            for i, (emoji, count) in enumerate(top_emojis)
+        ])
+        
+        embed.add_field(
+            name="Leaderboard",
+            value=leaderboard,
+            inline=False
+        )
+        
+        await message.reply(embed=embed)
+
+client.run()
+```
+
+## Important Notes
+
+### Unicode vs Custom Emojis
+
+Reactions can use both unicode emojis and custom guild emojis:
+
+```python
+# Unicode emoji (standard)
+await message.add_reaction("👍")
+
+# Custom emoji (guild-specific)
+await message.add_reaction("<:custom:123456789>")
+
+# Check emoji type
+if reaction.emoji.is_unicode_emoji:
+    print("Standard emoji")
+else:
+    print(f"Custom emoji ID: {reaction.emoji.id}")
+```
+
+### Reaction Limits
+
+- A message can have up to 20 unique reactions
+- Each reaction can be added by unlimited users
+- Bots need the "Add Reactions" permission to add new reaction types
+- Users can react without the permission if reactions already exist
+
+## Related Models
+
+- [Message](/api/models/message) - Messages can have reactions
+- [Emoji](/api/models/emoji) - Custom emojis used in reactions
+- [User](/api/models/user) - Users who add reactions

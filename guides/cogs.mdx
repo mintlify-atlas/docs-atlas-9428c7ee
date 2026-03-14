@@ -1,0 +1,274 @@
+---
+title: Cogs
+description: Organize your bot commands and event listeners into modular cogs
+---
+
+## Overview
+
+Cogs are a way to organize your bot's commands and event listeners into separate classes. This is similar to discord.py's cog system and helps you keep large bots maintainable by grouping related functionality together.
+
+## Creating a Cog
+
+A cog is a class that inherits from `fluxer.Cog`:
+
+```python
+from fluxer import Cog
+
+class MyCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+        # Cog initialization code here
+```
+
+The cog automatically discovers commands and listeners defined as methods using decorators.
+
+## Cog Commands
+
+Use the `@Cog.command()` decorator to define commands within a cog:
+
+```python
+from fluxer import Cog
+
+class FunCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+
+    @Cog.command()
+    async def hello(self, ctx):
+        await ctx.reply("Hello from the Fun cog!")
+
+    @Cog.command(name="bye")
+    async def goodbye(self, ctx):
+        await ctx.reply("Goodbye!")
+```
+
+<Note>
+Cog command methods receive `self` as the first parameter, then `ctx` as the second.
+</Note>
+
+## Cog Listeners
+
+Use the `@Cog.listener()` decorator to define event listeners:
+
+```python
+class ModerationCog(Cog):
+    @Cog.listener()
+    async def on_message(self, message):
+        # This will be called for every message
+        if "spam" in message.content.lower():
+            print(f"Potential spam from {message.author.display_name}")
+
+    @Cog.listener(name="on_ready")
+    async def bot_ready(self):
+        print("Moderation cog is ready!")
+```
+
+## Loading and Unloading Cogs
+
+### Loading Cogs
+
+Add a cog to your bot using `add_cog()`:
+
+```python
+import fluxer
+from my_cogs import FunCog
+
+bot = fluxer.Bot(command_prefix="!")
+
+@bot.event
+async def on_ready():
+    await bot.add_cog(FunCog(bot))
+    print("Cog loaded!")
+
+bot.run("your_token")
+```
+
+### Unloading Cogs
+
+Remove a cog by its class name:
+
+```python
+await bot.remove_cog("FunCog")
+```
+
+### Reloading Cogs
+
+For development, you can reload cogs without restarting:
+
+```python
+import importlib
+import my_cogs
+
+# Reload the module
+importlib.reload(my_cogs)
+
+# Remove old cog
+await bot.remove_cog("FunCog")
+
+# Add new cog
+await bot.add_cog(my_cogs.FunCog(bot))
+```
+
+## Cog Lifecycle Hooks
+
+Cogs have two lifecycle hooks you can override:
+
+```python
+class DatabaseCog(Cog):
+    async def cog_load(self):
+        """Called when the cog is loaded."""
+        print("Setting up database connection...")
+        self.db = await setup_database()
+
+    async def cog_unload(self):
+        """Called when the cog is unloaded."""
+        print("Closing database connection...")
+        await self.db.close()
+```
+
+<Warning>
+Always clean up resources in `cog_unload()` to prevent memory leaks when reloading cogs.
+</Warning>
+
+## Complete Cog Example
+
+Here's a complete example of a moderation cog:
+
+```python
+from fluxer import Cog
+
+class ModerationCog(Cog):
+    """Moderation commands and utilities."""
+
+    def __init__(self, bot):
+        super().__init__(bot)
+        self.warnings = {}  # Store user warnings
+
+    async def cog_load(self):
+        print("Moderation cog loaded!")
+
+    @Cog.command()
+    async def warn(self, ctx, user_id: int, *, reason: str):
+        """Warn a user."""
+        if user_id not in self.warnings:
+            self.warnings[user_id] = []
+        
+        self.warnings[user_id].append(reason)
+        count = len(self.warnings[user_id])
+        
+        await ctx.reply(
+            f"Warned user {user_id}. "
+            f"They now have {count} warning(s).\n"
+            f"Reason: {reason}"
+        )
+
+    @Cog.command()
+    async def warnings(self, ctx, user_id: int):
+        """Check warnings for a user."""
+        warns = self.warnings.get(user_id, [])
+        
+        if not warns:
+            await ctx.reply(f"User {user_id} has no warnings.")
+            return
+        
+        warning_list = "\n".join(
+            f"{i+1}. {w}" for i, w in enumerate(warns)
+        )
+        await ctx.reply(
+            f"**Warnings for user {user_id}:**\n{warning_list}"
+        )
+
+    @Cog.listener()
+    async def on_message(self, message):
+        """Monitor messages for rule violations."""
+        if message.author.bot:
+            return
+        
+        # Check for spam (example)
+        if message.content.count("http") > 3:
+            print(f"Spam detected from {message.author.id}")
+
+    async def cog_unload(self):
+        print("Moderation cog unloaded!")
+```
+
+## Using Extensions
+
+For even better organization, you can use the extension system which is compatible with discord.py:
+
+<Steps>
+  <Step title="Create an extension file">
+    Create `cogs/moderation.py`:
+    ```python
+    from fluxer import Cog
+
+    class ModerationCog(Cog):
+        @Cog.command()
+        async def ban(self, ctx, user_id: int):
+            await ctx.reply(f"Banned user {user_id}")
+
+    async def setup(bot):
+        """Required setup function for extensions."""
+        await bot.add_cog(ModerationCog(bot))
+    ```
+  </Step>
+
+  <Step title="Load the extension">
+    In your main bot file:
+    ```python
+    bot = fluxer.Bot(command_prefix="!")
+
+    @bot.event
+    async def on_ready():
+        await bot.load_extension("cogs.moderation")
+        print("Extension loaded!")
+    ```
+  </Step>
+
+  <Step title="Manage extensions">
+    ```python
+    # Unload
+    await bot.unload_extension("cogs.moderation")
+
+    # Reload (useful for development)
+    await bot.reload_extension("cogs.moderation")
+    ```
+  </Step>
+</Steps>
+
+## Accessing the Bot
+
+Inside a cog, you can access the bot instance via `self.bot`:
+
+```python
+class UtilityCog(Cog):
+    @Cog.command()
+    async def stats(self, ctx):
+        guild_count = len(self.bot.guilds)
+        await ctx.reply(f"I'm in {guild_count} guilds!")
+```
+
+## Getting Loaded Cogs
+
+You can get a specific cog or list all cogs:
+
+```python
+# Get a specific cog
+cog = bot.get_cog("ModerationCog")
+
+# Get all loaded cogs
+all_cogs = bot.cogs  # Returns a dict of {name: cog}
+```
+
+<Tip>
+Use cogs to organize your bot by feature area: moderation, fun commands, utilities, music, etc. This makes your code easier to maintain and test.
+</Tip>
+
+## Implementation Details
+
+The cog system is implemented in `fluxer/cog.py`. Key features:
+
+- **Auto-discovery** (cog.py:51-70): Cogs automatically scan their methods for `@Cog.command()` and `@Cog.listener()` decorators
+- **Command registration** (client.py:819-827): Commands are registered to the bot's command dictionary
+- **Event listeners** (client.py:829-835): Listeners are added to the bot's event handler list
+- **Lifecycle management** (client.py:840-841, 860): `cog_load()` and `cog_unload()` hooks are called automatically

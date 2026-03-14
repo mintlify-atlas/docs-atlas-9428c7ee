@@ -1,0 +1,384 @@
+---
+title: Emoji
+description: Represents a custom emoji in a Fluxer guild
+---
+
+## Overview
+
+The `Emoji` class represents a custom emoji in a Fluxer guild. Custom emojis can be used in messages and reactions, and are managed at the guild level.
+
+## Class Definition
+
+```python
+from fluxer.models import Emoji
+
+@dataclass(slots=True)
+class Emoji:
+    """Represents a custom emoji in a Fluxer guild."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the emoji
+</ResponseField>
+
+<ResponseField name="name" type="str" required>
+  The name of the emoji
+</ResponseField>
+
+<ResponseField name="animated" type="bool" default="False">
+  Whether the emoji is animated
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this emoji belongs to
+</ResponseField>
+
+<ResponseField name="roles" type="list[int]" default="[]">
+  List of role IDs that are whitelisted to use this emoji
+</ResponseField>
+
+<ResponseField name="managed" type="bool" default="False">
+  Whether the emoji is managed by an integration
+</ResponseField>
+
+<ResponseField name="available" type="bool" default="True">
+  Whether the emoji can be used (may be false due to server boosts)
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    *,
+    guild_id: int | None = None,
+) -> Emoji
+```
+
+Construct an Emoji instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw emoji object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+<ParamField path="guild_id" type="int | None">
+  Guild ID (may not be in data for some endpoints)
+</ParamField>
+
+### delete
+
+```python
+async def delete(*, reason: str | None = None) -> None
+```
+
+Delete this emoji from its guild.
+
+<ParamField path="reason" type="str | None">
+  Reason for deletion (shows in audit log)
+</ParamField>
+
+**Example:**
+```python
+await emoji.delete(reason="Emoji no longer needed")
+```
+
+## String Representation
+
+The `__str__` method returns the emoji in a format that can be used in messages:
+
+```python
+print(str(emoji))  # <:name:123456789> or <a:name:123456789> for animated
+
+# Use in a message
+await channel.send(f"React with {emoji}!")
+```
+
+## Usage Examples
+
+### Listing Guild Emojis
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!emojis":
+        if not message.guild_id:
+            return
+        
+        guild = await client.fetch_guild(message.guild_id)
+        emojis = await guild.fetch_emojis()
+        
+        if not emojis:
+            await message.reply("This server has no custom emojis.")
+            return
+        
+        # Separate static and animated
+        static = [e for e in emojis if not e.animated]
+        animated = [e for e in emojis if e.animated]
+        
+        embed = Embed(
+            title=f"Custom Emojis in {guild.name}",
+            description=f"Total: {len(emojis)} emojis",
+            color=0x5865F2
+        )
+        
+        if static:
+            static_list = " ".join([str(e) for e in static[:10]])
+            embed.add_field(
+                name=f"Static ({len(static)})",
+                value=static_list,
+                inline=False
+            )
+        
+        if animated:
+            animated_list = " ".join([str(e) for e in animated[:10]])
+            embed.add_field(
+                name=f"Animated ({len(animated)})",
+                value=animated_list,
+                inline=False
+            )
+        
+        await message.reply(embed=embed)
+
+client.run()
+```
+
+### Emoji Information
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!emojiinfo"):
+        if not message.guild_id:
+            return
+        
+        parts = message.content.split()
+        if len(parts) >= 2:
+            emoji_id = int(parts[1])
+            
+            guild = await client.fetch_guild(message.guild_id)
+            emojis = await guild.fetch_emojis()
+            emoji = next((e for e in emojis if e.id == emoji_id), None)
+            
+            if not emoji:
+                await message.reply("Emoji not found!")
+                return
+            
+            embed = Embed(
+                title=f"Emoji: {emoji.name}",
+                color=0x5865F2
+            )
+            
+            embed.add_field(name="ID", value=str(emoji.id), inline=True)
+            embed.add_field(name="Name", value=emoji.name, inline=True)
+            embed.add_field(name="Animated", value="Yes" if emoji.animated else "No", inline=True)
+            embed.add_field(name="Managed", value="Yes" if emoji.managed else "No", inline=True)
+            embed.add_field(name="Available", value="Yes" if emoji.available else "No", inline=True)
+            
+            if emoji.roles:
+                embed.add_field(
+                    name="Role Restricted",
+                    value=f"{len(emoji.roles)} roles",
+                    inline=True
+                )
+            
+            embed.add_field(
+                name="Format",
+                value=f"`{emoji}`",
+                inline=False
+            )
+            
+            await message.reply(embed=embed)
+
+client.run()
+```
+
+### Using Emojis in Messages
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!welcome":
+        if not message.guild_id:
+            return
+        
+        # Fetch guild emojis
+        guild = await client.fetch_guild(message.guild_id)
+        emojis = await guild.fetch_emojis()
+        
+        # Find specific emojis by name
+        wave_emoji = next((e for e in emojis if e.name == "wave"), None)
+        party_emoji = next((e for e in emojis if e.name == "party"), None)
+        
+        # Build message with custom emojis
+        msg = f"Welcome to the server! {wave_emoji} {party_emoji}"
+        await message.channel.send(msg)
+
+client.run()
+```
+
+### Emoji Management Commands
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if not message.guild_id:
+        return
+    
+    guild = await client.fetch_guild(message.guild_id)
+    
+    if message.content.startswith("!emoji delete"):
+        # Delete an emoji by ID
+        parts = message.content.split()
+        if len(parts) >= 3:
+            emoji_id = int(parts[2])
+            
+            emojis = await guild.fetch_emojis()
+            emoji = next((e for e in emojis if e.id == emoji_id), None)
+            
+            if emoji:
+                await emoji.delete(reason="Moderator command")
+                await message.reply(f"Deleted emoji: {emoji.name}")
+            else:
+                await message.reply("Emoji not found!")
+    
+    elif message.content == "!emoji stats":
+        # Show emoji statistics
+        emojis = await guild.fetch_emojis()
+        
+        static_count = sum(1 for e in emojis if not e.animated)
+        animated_count = sum(1 for e in emojis if e.animated)
+        managed_count = sum(1 for e in emojis if e.managed)
+        restricted_count = sum(1 for e in emojis if e.roles)
+        
+        from fluxer import Embed
+        embed = Embed(
+            title="Emoji Statistics",
+            color=0x5865F2
+        )
+        
+        embed.add_field(name="Total", value=str(len(emojis)), inline=True)
+        embed.add_field(name="Static", value=str(static_count), inline=True)
+        embed.add_field(name="Animated", value=str(animated_count), inline=True)
+        embed.add_field(name="Managed", value=str(managed_count), inline=True)
+        embed.add_field(name="Role Restricted", value=str(restricted_count), inline=True)
+        
+        await message.reply(embed=embed)
+
+client.run()
+```
+
+### React with Custom Emoji
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!vote":
+        if not message.guild_id:
+            return
+        
+        # Create a poll with custom emoji reactions
+        guild = await client.fetch_guild(message.guild_id)
+        emojis = await guild.fetch_emojis()
+        
+        # Find thumbs up/down emojis (or use unicode)
+        upvote = next((e for e in emojis if e.name == "upvote"), None)
+        downvote = next((e for e in emojis if e.name == "downvote"), None)
+        
+        poll_msg = await message.channel.send("Vote on this proposal!")
+        
+        # Add reactions
+        if upvote:
+            await poll_msg.add_reaction(str(upvote))
+        else:
+            await poll_msg.add_reaction("👍")  # Fallback to unicode
+        
+        if downvote:
+            await poll_msg.add_reaction(str(downvote))
+        else:
+            await poll_msg.add_reaction("👎")  # Fallback to unicode
+
+client.run()
+```
+
+## Emoji Format
+
+Custom emojis use a specific format in messages:
+
+- **Static emoji**: `<:name:id>` - Example: `<:smile:123456789>`
+- **Animated emoji**: `<a:name:id>` - Example: `<a:dance:987654321>`
+
+The `__str__` method automatically formats the emoji correctly:
+
+```python
+print(str(emoji))  # Outputs the correct format
+
+# Use in API calls
+await message.add_reaction(str(emoji))
+```
+
+## Important Notes
+
+### Emoji Limits
+
+- Guilds have limits on the number of custom emojis based on boost level
+- Animated emojis count separately from static emojis
+- Emoji names must be at least 2 characters long
+
+### Role Restrictions
+
+Emojis can be restricted to specific roles:
+
+```python
+if emoji.roles:
+    print(f"This emoji is restricted to {len(emoji.roles)} roles")
+else:
+    print("This emoji can be used by everyone")
+```
+
+### Managed Emojis
+
+Managed emojis are created by integrations (like Twitch) and cannot be deleted manually:
+
+```python
+if emoji.managed:
+    print("This emoji is managed by an integration")
+```
+
+## Related Models
+
+- [Guild](/api/models/guild) - Guilds contain custom emojis
+- [Reaction](/api/models/reaction) - Emojis can be used in reactions
+- [Message](/api/models/message) - Emojis can be used in messages

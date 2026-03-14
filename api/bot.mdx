@@ -1,0 +1,331 @@
+---
+title: Bot
+description: Extended Client with command support, cog support, and bot-specific features
+---
+
+## Bot
+
+Extended [Client](/api/client) with common bot conveniences. Adds prefix command support, cog support, and other bot-specific features. This is the recommended class for most bot use cases.
+
+### Constructor
+
+```python
+Bot(
+    *,
+    command_prefix: str = "!",
+    intents: Intents = Intents.default(),
+    api_url: str | None = None,
+    max_retries: int = 4,
+    retry_forever: bool = False
+)
+```
+
+<ParamField path="command_prefix" type="str" default="!">
+  Prefix for text commands.
+</ParamField>
+
+<ParamField path="intents" type="Intents" default="Intents.default()">
+  Gateway intents to request.
+</ParamField>
+
+<ParamField path="api_url" type="str | None" default="None">
+  Base URL for the Fluxer API (default: `https://api.fluxer.app/v1`). Use this to connect to self-hosted Fluxer instances.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="4">
+  Maximum number of retries for HTTP requests.
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry HTTP requests indefinitely.
+</ParamField>
+
+### Properties
+
+Bot inherits all properties from [Client](/api/client):
+
+- `user` - The bot user (available after READY)
+- `guilds` - List of guilds the bot is in
+
+#### cogs
+
+```python
+@property
+def cogs(self) -> dict[str, Any]
+```
+
+Get all loaded cogs.
+
+#### extensions
+
+```python
+@property
+def extensions(self) -> dict[str, Any]
+```
+
+Get all loaded extensions.
+
+## Command Registration
+
+### command
+
+```python
+def command(
+    name: str | None = None
+) -> Callable[[EventHandler], EventHandler]
+```
+
+Decorator to register a prefix command.
+
+<ParamField path="name" type="str | None" default="None">
+  Optional command name. If not provided, uses the function name.
+</ParamField>
+
+**Example:**
+
+```python
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command(name="hello")
+async def greet(ctx):
+    await ctx.reply(f"Hello, {ctx.author}!")
+```
+
+**Command Arguments:**
+
+Commands support positional arguments, keyword-only arguments, type hints, and default values:
+
+```python
+# Positional arguments
+@bot.command()
+async def add(ctx, a: int, b: int):
+    await ctx.reply(f"{a} + {b} = {a + b}")
+
+# Keyword-only arguments (captures all remaining text)
+@bot.command()
+async def say(ctx, *, message: str):
+    await ctx.reply(message)
+
+# Default values
+@bot.command()
+async def greet(ctx, name: str = "World"):
+    await ctx.reply(f"Hello, {name}!")
+```
+
+## Cog Management
+
+### add_cog
+
+```python
+async def add_cog(cog: Any) -> None
+```
+
+Add a cog to the bot.
+
+<ParamField path="cog" type="Any" required>
+  An instance of a Cog subclass.
+</ParamField>
+
+**Example:**
+
+```python
+from fluxer import Cog
+
+class MyCog(Cog):
+    @Cog.command()
+    async def hello(self, ctx):
+        await ctx.reply("Hello from MyCog!")
+
+bot = Bot()
+await bot.add_cog(MyCog(bot))
+```
+
+### remove_cog
+
+```python
+async def remove_cog(cog_name: str) -> None
+```
+
+Remove a cog from the bot.
+
+<ParamField path="cog_name" type="str" required>
+  The name of the cog class to remove.
+</ParamField>
+
+**Example:**
+
+```python
+await bot.remove_cog("MyCog")
+```
+
+### reload_cog
+
+```python
+async def reload_cog(cog_name: str) -> None
+```
+
+Reload a cog by removing it. Useful during development to reload code changes without restarting the bot.
+
+<ParamField path="cog_name" type="str" required>
+  The name of the cog class to reload.
+</ParamField>
+
+<Note>
+After calling `reload_cog`, you'll need to re-add the cog with `add_cog()`.
+</Note>
+
+### get_cog
+
+```python
+def get_cog(cog_name: str) -> Any | None
+```
+
+Get a loaded cog by name.
+
+<ParamField path="cog_name" type="str" required>
+  The name of the cog class.
+</ParamField>
+
+**Returns:** The cog instance, or None if not found.
+
+## Extension Management
+
+Extensions work like discord.py's extension system. Extensions are Python modules containing cogs and commands.
+
+### load_extension
+
+```python
+async def load_extension(name: str) -> None
+```
+
+Load an extension (module) containing cogs and commands. The extension must have a `setup()` function that takes the bot instance as an argument.
+
+<ParamField path="name" type="str" required>
+  The module path (e.g., "cogs.moderation" or "my_cogs.fun").
+</ParamField>
+
+**Example:**
+
+```python
+# In cogs/moderation.py:
+from fluxer import Cog
+
+class ModerationCog(Cog):
+    @Cog.command()
+    async def ban(self, ctx):
+        await ctx.reply("Ban command!")
+
+async def setup(bot):
+    await bot.add_cog(ModerationCog(bot))
+
+# In your main bot file:
+await bot.load_extension("cogs.moderation")
+```
+
+### unload_extension
+
+```python
+async def unload_extension(name: str) -> None
+```
+
+Unload an extension.
+
+<ParamField path="name" type="str" required>
+  The module path of the extension to unload.
+</ParamField>
+
+**Example:**
+
+```python
+await bot.unload_extension("cogs.moderation")
+```
+
+### reload_extension
+
+```python
+async def reload_extension(name: str) -> None
+```
+
+Reload an extension by unloading and loading it again. Useful during development to reload code changes without restarting.
+
+<ParamField path="name" type="str" required>
+  The module path of the extension to reload.
+</ParamField>
+
+**Example:**
+
+```python
+await bot.reload_extension("cogs.moderation")
+```
+
+## Event Registration
+
+Bot inherits all event registration methods from [Client](/api/client):
+
+- `event()` - Decorator to register an event handler
+- `on()` - Decorator to register an event handler with an explicit name
+
+## Connection Lifecycle
+
+Bot inherits all connection lifecycle methods from [Client](/api/client):
+
+- `run()` - Blocking call to start the bot
+- `start()` - Async method to start the bot
+- `close()` - Close the bot connection
+
+## HTTP Methods
+
+Bot inherits all HTTP convenience methods from [Client](/api/client):
+
+- `fetch_channel()`
+- `fetch_message()`
+- `delete_message()`
+- `fetch_guild()`
+- `fetch_user()`
+- `fetch_user_profile()`
+- `fetch_webhook()`
+- `fetch_channel_webhooks()`
+- `fetch_guild_webhooks()`
+- `create_webhook()`
+
+## Voice Methods
+
+Bot inherits all voice methods from [Client](/api/client):
+
+- `join_voice()`
+- `get_voice_state()`
+- `get_guild_voice_states()`
+
+## Reaction Methods
+
+Bot inherits all reaction methods from [Client](/api/client):
+
+- `add_reaction()`
+- `remove_reaction()`
+- `clear_reactions()`
+- `clear_reaction()`
+
+## Example
+
+```python
+from fluxer import Bot, Intents
+
+bot = Bot(command_prefix="!", intents=Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command()
+async def add(ctx, a: int, b: int):
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+
+bot.run("your_token_here")
+```

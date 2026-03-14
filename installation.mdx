@@ -1,0 +1,246 @@
+---
+title: Installation
+description: Install fluxer.py and set up your development environment
+---
+
+## Requirements
+
+fluxer.py requires **Python 3.10 or higher**.
+
+<Note>
+  Supported Python versions: 3.10, 3.11, 3.12, 3.13
+</Note>
+
+## Basic Installation
+
+<Steps>
+  <Step title="Install via pip">
+    The simplest way to install fluxer.py is using pip:
+    
+    ```bash
+    pip install fluxer.py
+    ```
+  </Step>
+  
+  <Step title="Verify installation">
+    Verify the installation by importing the library:
+    
+    ```python
+    import fluxer
+    print(fluxer.__version__)
+    ```
+  </Step>
+</Steps>
+
+## Installation with uv
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager. If you're using uv:
+
+```bash
+uv add fluxer.py
+```
+
+## Voice Support
+
+<Warning>
+  Voice support requires additional dependencies and ffmpeg to be installed on your system.
+</Warning>
+
+To use voice features, install fluxer.py with the `voice` extra:
+
+<CodeGroup>
+
+```bash pip
+pip install fluxer.py[voice]
+```
+
+```bash uv
+uv add fluxer.py --extra voice
+```
+
+</CodeGroup>
+
+This installs the optional `livekit` dependency (version 0.17.0 or higher) required for voice connections.
+
+### Installing ffmpeg
+
+ffmpeg must be installed separately and available on your system `PATH`.
+
+<Tabs>
+  <Tab title="macOS">
+    Using [Homebrew](https://brew.sh/):
+    
+    ```bash
+    brew install ffmpeg
+    ```
+  </Tab>
+  
+  <Tab title="Linux (Debian/Ubuntu)">
+    Using apt:
+    
+    ```bash
+    apt install ffmpeg
+    ```
+    
+    Or using sudo:
+    
+    ```bash
+    sudo apt install ffmpeg
+    ```
+  </Tab>
+  
+  <Tab title="Windows">
+    Using [Chocolatey](https://chocolatey.org/install):
+    
+    ```bash
+    choco install ffmpeg
+    ```
+    
+    Alternatively, download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to your PATH.
+  </Tab>
+</Tabs>
+
+### Verify ffmpeg Installation
+
+Check that ffmpeg is correctly installed:
+
+```bash
+ffmpeg -version
+```
+
+## Development Installation
+
+For contributing or local development:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/akarealemil/fluxer.py.git
+    cd fluxer.py
+    ```
+  </Step>
+  
+  <Step title="Install in editable mode">
+    Using pip:
+    
+    ```bash
+    pip install -e .
+    ```
+    
+    Or with uv (recommended for development):
+    
+    ```bash
+    uv sync --dev
+    ```
+    
+    This creates a `.venv` virtual environment and installs all development dependencies.
+  </Step>
+  
+  <Step title="Install development dependencies">
+    Development dependencies include:
+    - `pytest` (7.0.0+) - Testing framework
+    - `pytest-asyncio` (1.3.0+) - Async test support
+    - `pytest-cov` (7.0.0+) - Coverage reporting
+    - `pyright` (1.1.408+) - Type checking
+    - `ruff` (0.15.0+) - Linting and formatting
+  </Step>
+</Steps>
+
+## Virtual Environments
+
+<Note>
+  It's strongly recommended to use a virtual environment to avoid dependency conflicts.
+</Note>
+
+### Using venv
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate on Linux/macOS
+source venv/bin/activate
+
+# Activate on Windows
+venv\Scripts\activate
+
+# Install fluxer.py
+pip install fluxer.py
+```
+
+### Using uv
+
+```bash
+# uv automatically creates and manages virtual environments
+uv venv
+source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate     # Windows
+uv add fluxer.py
+```
+
+## Upgrading
+
+To upgrade to the latest version:
+
+<CodeGroup>
+
+```bash pip
+pip install --upgrade fluxer.py
+```
+
+```bash uv
+uv add fluxer.py --upgrade
+```
+
+</CodeGroup>
+
+## Dependencies
+
+fluxer.py has minimal core dependencies:
+
+- **aiohttp** (3.9.0 - 4.0.0) - Async HTTP client/server
+- **emoji** (2.0.0+) - Emoji handling
+
+Optional dependencies:
+
+- **livekit** (0.17.0+) - Voice support (install with `[voice]` extra)
+
+## Troubleshooting
+
+### ImportError: No module named 'fluxer'
+
+Make sure you've activated your virtual environment and installed the package:
+
+```bash
+pip list | grep fluxer
+```
+
+### Voice features not working
+
+Ensure you've installed the voice extra and ffmpeg:
+
+```bash
+pip show livekit  # Should show package info
+ffmpeg -version   # Should show ffmpeg version
+```
+
+### Python version issues
+
+Check your Python version:
+
+```bash
+python --version
+```
+
+fluxer.py requires Python 3.10 or higher. If you have multiple Python versions installed, you may need to use `python3.10` or higher explicitly.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first bot in minutes
+  </Card>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn about fluxer.py's architecture
+  </Card>
+</CardGroup>

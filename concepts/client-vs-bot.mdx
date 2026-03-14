@@ -1,0 +1,309 @@
+---
+title: Client vs Bot
+description: Understanding the difference between Client and Bot classes in fluxer.py
+---
+
+## Overview
+
+fluxer.py provides two main classes for building applications: `Client` and `Bot`. Understanding when to use each is crucial for building your application correctly.
+
+<Note>
+For most use cases, you should use the `Bot` class. Only use `Client` if you need full control over the gateway lifecycle or are building a custom framework.
+</Note>
+
+## Client Class
+
+The `Client` class is a low-level client that connects to Fluxer and dispatches events. It gives you full control over the gateway lifecycle.
+
+### Definition
+
+From `fluxer/client.py:25-35`:
+
+```python
+class Client:
+    """Low-level client that connects to Fluxer and dispatches events.
+
+    This gives you full control over the gateway lifecycle.
+    For most bots, use the Bot subclass instead.
+
+    Args:
+        intents: Gateway intents to request (default: Intents.default())
+        api_url: Base URL for the Fluxer API (default: https://api.fluxer.app/v1)
+                 Use this to connect to self-hosted Fluxer instances
+    """
+```
+
+### Basic Usage
+
+```python
+from fluxer import Client, Intents
+
+client = Client(intents=Intents.default())
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user}")
+
+@client.event
+async def on_message(message):
+    print(f"Message from {message.author}: {message.content}")
+
+client.run("YOUR_BOT_TOKEN")
+```
+
+### Key Features
+
+- **Event System**: Register event handlers with the `@client.event` decorator
+- **Gateway Control**: Full control over connection lifecycle
+- **HTTP Methods**: Built-in methods for API calls (`fetch_channel`, `fetch_guild`, etc.)
+- **Cache**: Internal caching of guilds, channels, and voice states
+
+### Constructor Parameters
+
+From `fluxer/client.py:37-44`:
+
+```python
+def __init__(
+    self,
+    *,
+    intents: Intents = Intents.default(),
+    api_url: str | None = None,
+    max_retries: int = 5,
+    retry_forever: bool = False,
+) -> None:
+```
+
+<Accordion title="Client Properties">
+
+**`client.user`** - The bot user, available after the READY event
+
+```python
+@client.event
+async def on_ready():
+    print(f"Bot user: {client.user.username}")
+```
+
+**`client.guilds`** - List of guilds the bot is in (populated from READY + GUILD_CREATE)
+
+```python
+for guild in client.guilds:
+    print(f"In guild: {guild.name}")
+```
+
+</Accordion>
+
+## Bot Class
+
+The `Bot` class extends `Client` with common bot conveniences, including prefix commands and cog support. **This is the recommended class for most bot use cases.**
+
+### Definition
+
+From `fluxer/client.py:598-611`:
+
+```python
+class Bot(Client):
+    """Extended Client with common bot conveniences.
+
+    Adds prefix command support, cog support, and other bot-specific features.
+    This is the recommended class for most bot use cases.
+
+    Args:
+        command_prefix: Prefix for text commands (default: "!")
+        intents: Gateway intents to request (default: Intents.default())
+        api_url: Base URL for the Fluxer API (default: https://api.fluxer.app/v1)
+                 Use this to connect to self-hosted Fluxer instances
+        max_retries: Maximum number of retries for HTTP requests (default: 4)
+        retry_forever: Whether to retry HTTP requests indefinitely (default: False)
+    """
+```
+
+### Basic Usage
+
+```python
+from fluxer import Bot, Intents
+
+bot = Bot(command_prefix="!", intents=Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready: {bot.user}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command(name="hello")
+async def greet(ctx):
+    await ctx.reply(f"Hello, {ctx.author.display_name}!")
+
+bot.run("YOUR_BOT_TOKEN")
+```
+
+### Additional Features
+
+<CardGroup cols={2}>
+
+<Card title="Prefix Commands" icon="terminal">
+  Register commands with the `@bot.command()` decorator. Commands automatically parse arguments based on type hints.
+</Card>
+
+<Card title="Cog Support" icon="puzzle-piece">
+  Load and unload cogs for modular bot structure with `bot.add_cog()` and `bot.load_extension()`.
+</Card>
+
+<Card title="Extension System" icon="plug">
+  Discord.py-compatible extension loading with `load_extension()` and `reload_extension()`.
+</Card>
+
+<Card title="Argument Parsing" icon="code">
+  Automatic argument parsing with type hints and keyword-only arguments.
+</Card>
+
+</CardGroup>
+
+### Command Examples
+
+From `fluxer/client.py:638-660`:
+
+```python
+@bot.command()
+async def ping(ctx):
+    """Simple command with no arguments"""
+    await ctx.reply("Pong!")
+
+@bot.command()
+async def echo(ctx, *, message: str):
+    """Command with keyword-only argument (captures all text)"""
+    await ctx.reply(message)
+
+@bot.command()
+async def add(ctx, a: int, b: int):
+    """Command with typed arguments"""
+    await ctx.reply(f"{a} + {b} = {a + b}")
+```
+
+## When to Use Each
+
+<Warning>
+Do not inherit from both Client and Bot. Bot already inherits from Client.
+</Warning>
+
+### Use Client When:
+
+- Building a custom framework on top of fluxer.py
+- You need fine-grained control over the gateway lifecycle
+- You don't need command parsing or cog management
+- Building a user bot or special-purpose application
+
+### Use Bot When:
+
+- Building a traditional prefix-command bot
+- You want cog/extension support for modular code
+- You need automatic argument parsing
+- You're migrating from discord.py
+- You want the quickest path to a working bot
+
+## Architecture Comparison
+
+```python
+# Client: Manual event handling
+from fluxer import Client, Intents
+
+client = Client(intents=Intents.default())
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!ping"):
+        await message.reply("Pong!")
+
+client.run(token)
+```
+
+```python
+# Bot: Automatic command parsing
+from fluxer import Bot, Intents
+
+bot = Bot(command_prefix="!", intents=Intents.default())
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+bot.run(token)
+```
+
+## Shared Methods
+
+Both `Client` and `Bot` share these common methods:
+
+<Accordion title="Connection Methods">
+
+**`run(token: str)`** - Blocking call that connects and runs the bot
+
+```python
+bot.run("YOUR_BOT_TOKEN")
+```
+
+**`start(token: str)`** - Async version for managing your own event loop
+
+```python
+await bot.start("YOUR_BOT_TOKEN")
+```
+
+**`close()`** - Disconnect and clean up resources
+
+```python
+await bot.close()
+```
+
+</Accordion>
+
+<Accordion title="HTTP Methods">
+
+**`fetch_channel(channel_id)`** - Fetch a channel from the API
+
+**`fetch_guild(guild_id)`** - Fetch a guild from the API
+
+**`fetch_user(user_id)`** - Fetch a user from the API
+
+**`fetch_message(channel_id, message_id)`** - Fetch a specific message
+
+**`delete_message(channel_id, message_id)`** - Delete a message
+
+See `fluxer/client.py:324-411` for the complete list.
+
+</Accordion>
+
+<Accordion title="Voice Methods">
+
+**`join_voice(guild_id, channel_id)`** - Join a voice channel
+
+**`get_voice_state(guild_id, user_id)`** - Get cached voice state
+
+**`get_guild_voice_states(guild_id)`** - Get all voice states for a guild
+
+Requires `pip install fluxer.py[voice]`
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Events" icon="bolt" href="/concepts/events">
+  Learn about the event system and available events
+</Card>
+
+<Card title="Intents" icon="filter" href="/concepts/intents">
+  Configure which events your bot receives
+</Card>
+
+<Card title="Error Handling" icon="triangle-exclamation" href="/concepts/error-handling">
+  Handle errors and exceptions gracefully
+</Card>
+
+<Card title="Commands" icon="terminal" href="/guides/commands">
+  Build commands with the Bot class
+</Card>
+
+</CardGroup>

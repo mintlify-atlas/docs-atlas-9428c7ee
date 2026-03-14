@@ -1,0 +1,354 @@
+---
+title: Webhooks
+description: Create and manage webhooks for sending messages as different identities
+---
+
+## Overview
+
+Webhooks allow your bot to send messages with custom names and avatars, making them perfect for logging, notifications, or impersonation features. The `Webhook` model provides a complete interface for webhook management.
+
+## Webhook Model
+
+The `Webhook` class represents a Fluxer webhook:
+
+```python
+@dataclass(slots=True)
+class Webhook:
+    id: int
+    guild_id: int
+    channel_id: int
+    user: User            # The user who created the webhook
+    name: str
+    avatar: str | None
+    token: str
+```
+
+## Creating Webhooks
+
+Create a webhook in a channel using the bot client:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!")
+
+@bot.command()
+async def create_webhook(ctx):
+    webhook = await bot.create_webhook(
+        channel_id=str(ctx.channel_id),
+        name="My Webhook",
+        avatar=None  # Optional: base64 data URI
+    )
+    
+    await ctx.reply(
+        f"Created webhook: {webhook.name}\n"
+        f"ID: {webhook.id}"
+    )
+```
+
+### With Custom Avatar
+
+```python
+import base64
+
+# Read and encode image
+with open("avatar.png", "rb") as f:
+    image_data = base64.b64encode(f.read()).decode()
+    avatar = f"data:image/png;base64,{image_data}"
+
+webhook = await bot.create_webhook(
+    channel_id=channel_id,
+    name="Custom Avatar Webhook",
+    avatar=avatar
+)
+```
+
+## Fetching Webhooks
+
+### Fetch a Specific Webhook
+
+```python
+webhook = await bot.fetch_webhook(webhook_id)
+print(f"Webhook: {webhook.name}")
+```
+
+### Fetch All Webhooks in a Channel
+
+```python
+webhooks = await bot.fetch_channel_webhooks(channel_id)
+
+for webhook in webhooks:
+    print(f"- {webhook.name} (ID: {webhook.id})")
+```
+
+### Fetch All Webhooks in a Guild
+
+```python
+webhooks = await bot.fetch_guild_webhooks(guild_id)
+
+for webhook in webhooks:
+    print(f"- {webhook.name} in channel {webhook.channel_id}")
+```
+
+## Sending Webhook Messages
+
+Use the `send()` method to send messages through a webhook:
+
+```python
+webhook = await bot.fetch_webhook(webhook_id)
+
+# Simple message
+message = await webhook.send(
+    content="Hello from a webhook!",
+    wait=True  # Returns the created message
+)
+
+if message:
+    print(f"Sent message: {message.id}")
+```
+
+### Custom Username and Avatar
+
+Override the webhook's default name and avatar per-message:
+
+```python
+await webhook.send(
+    content="This is a custom message",
+    username="Custom Name",
+    avatar_url="https://example.com/avatar.png"
+)
+```
+
+### With Embeds
+
+```python
+from fluxer import Embed
+
+embed = Embed(
+    title="Webhook Embed",
+    description="Sent via webhook",
+    color=0x00ff00
+)
+
+await webhook.send(
+    content="Check out this embed!",
+    embeds=[embed.to_dict()]
+)
+```
+
+### With File Attachments
+
+```python
+from fluxer import File
+
+file = File(
+    filename="data.txt",
+    content=b"File content here",
+    content_type="text/plain"
+)
+
+await webhook.send(
+    content="Here's a file",
+    file=file
+)
+
+# Multiple files
+await webhook.send(
+    content="Multiple files",
+    files=[file1, file2]
+)
+```
+
+### Wait Parameter
+
+The `wait` parameter determines if the method returns the created message:
+
+```python
+# wait=False (default): Returns None immediately
+await webhook.send(content="Fast send")
+
+# wait=True: Waits for and returns the Message object
+message = await webhook.send(
+    content="Wait for response",
+    wait=True
+)
+print(f"Message ID: {message.id}")
+```
+
+<Note>
+Set `wait=True` if you need to interact with the message after sending it (e.g., adding reactions, editing).
+</Note>
+
+## Editing Webhooks
+
+Modify a webhook's properties using the `edit()` method:
+
+```python
+webhook = await bot.fetch_webhook(webhook_id)
+
+# Update name and avatar
+updated = await webhook.edit(
+    name="New Webhook Name",
+    avatar=new_avatar_data
+)
+
+print(f"Updated: {updated.name}")
+```
+
+### Moving to a Different Channel
+
+```python
+updated = await webhook.edit(
+    channel_id=new_channel_id
+)
+```
+
+## Deleting Webhooks
+
+```python
+webhook = await bot.fetch_webhook(webhook_id)
+
+await webhook.delete(reason="No longer needed")
+```
+
+<Warning>
+Deleting a webhook is permanent and cannot be undone. The webhook token will be invalidated.
+</Warning>
+
+## Complete Example: Logging System
+
+<Steps>
+  <Step title="Create logging webhook">
+    ```python
+    import fluxer
+
+    bot = fluxer.Bot(command_prefix="!")
+    LOG_CHANNEL_ID = "your_log_channel_id"
+    log_webhook = None
+
+    @bot.event
+    async def on_ready():
+        global log_webhook
+        
+        # Find existing webhook or create new one
+        webhooks = await bot.fetch_channel_webhooks(LOG_CHANNEL_ID)
+        
+        for wh in webhooks:
+            if wh.name == "Bot Logger":
+                log_webhook = wh
+                break
+        
+        if not log_webhook:
+            log_webhook = await bot.create_webhook(
+                channel_id=LOG_CHANNEL_ID,
+                name="Bot Logger"
+            )
+        
+        print(f"Logger ready! Using webhook {log_webhook.id}")
+    ```
+  </Step>
+
+  <Step title="Create logging function">
+    ```python
+    async def log_event(event_type: str, description: str, color: int):
+        """Send a formatted log message via webhook."""
+        from fluxer import Embed
+        from datetime import datetime
+        
+        embed = Embed(
+            title=f"📋 {event_type}",
+            description=description,
+            color=color,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+        await log_webhook.send(
+            embeds=[embed.to_dict()],
+            username="Event Logger"
+        )
+    ```
+  </Step>
+
+  <Step title="Use logging in events">
+    ```python
+    @bot.event
+    async def on_message(message):
+        # Process commands
+        if message.content.startswith(bot.command_prefix):
+            await log_event(
+                "Command Used",
+                f"{message.author.display_name} used: {message.content}",
+                0x5865f2  # Blurple
+            )
+
+    @bot.event
+    async def on_guild_join(guild):
+        await log_event(
+            "Guild Joined",
+            f"Joined guild: {guild.name} (ID: {guild.id})",
+            0x57f287  # Green
+        )
+
+    @bot.event
+    async def on_guild_remove(guild):
+        await log_event(
+            "Guild Left",
+            f"Left guild: {guild.name if hasattr(guild, 'name') else 'Unknown'}",
+            0xed4245  # Red
+        )
+    ```
+  </Step>
+</Steps>
+
+## Advanced: Multiple Identity Webhooks
+
+Create a system that speaks through different personas:
+
+```python
+class PersonaManager:
+    def __init__(self, bot, channel_id):
+        self.bot = bot
+        self.channel_id = channel_id
+        self.personas = {}
+    
+    async def setup(self):
+        """Create webhooks for different personas."""
+        personas_config = [
+            {"name": "Info Bot", "avatar": "info_avatar.png"},
+            {"name": "Warning Bot", "avatar": "warning_avatar.png"},
+            {"name": "Error Bot", "avatar": "error_avatar.png"},
+        ]
+        
+        for config in personas_config:
+            webhook = await self.bot.create_webhook(
+                channel_id=self.channel_id,
+                name=config["name"]
+            )
+            self.personas[config["name"]] = webhook
+    
+    async def speak_as(self, persona_name: str, message: str):
+        """Send a message as a specific persona."""
+        webhook = self.personas.get(persona_name)
+        if webhook:
+            await webhook.send(content=message)
+
+# Usage
+persona_mgr = PersonaManager(bot, channel_id)
+await persona_mgr.setup()
+
+await persona_mgr.speak_as("Info Bot", "Here's some info!")
+await persona_mgr.speak_as("Warning Bot", "⚠️ Warning!")
+```
+
+## Implementation Reference
+
+The webhook implementation is in `fluxer/models/webhook.py`:
+
+- **from_data()** (webhook.py:28-55): Constructs Webhook from API data
+- **edit()** (webhook.py:57-80): Updates webhook properties
+- **send()** (webhook.py:82-130): Executes webhook to send messages
+- **delete()** (webhook.py:132-146): Deletes the webhook
+
+<Tip>
+Use webhooks for logging systems, RSS feeds, or any feature where you want messages to appear from different sources without creating multiple bot accounts.
+</Tip>

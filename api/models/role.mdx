@@ -1,0 +1,477 @@
+---
+title: Role
+description: Represents a guild role
+---
+
+## Overview
+
+The `Role` class represents a role in a Fluxer guild. Roles define permissions and can be assigned to members for access control and visual organization.
+
+## Class Definition
+
+```python
+from fluxer.models import Role
+
+@dataclass(slots=True)
+class Role:
+    """Represents a guild role."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the role
+</ResponseField>
+
+<ResponseField name="name" type="str" required>
+  The name of the role
+</ResponseField>
+
+<ResponseField name="color" type="int" default="0">
+  RGB color value for the role
+</ResponseField>
+
+<ResponseField name="hoist" type="bool" default="False">
+  Whether the role is displayed separately in the member list
+</ResponseField>
+
+<ResponseField name="position" type="int" default="0">
+  Position in the role hierarchy (higher = more important)
+</ResponseField>
+
+<ResponseField name="permissions" type="int" default="0">
+  Permission bitfield for this role
+</ResponseField>
+
+<ResponseField name="managed" type="bool" default="False">
+  Whether the role is managed by an integration (bots, boosters, etc.)
+</ResponseField>
+
+<ResponseField name="mentionable" type="bool" default="False">
+  Whether the role can be mentioned in messages
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this role belongs to
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="created_at" type="datetime">
+  When this role was created (derived from snowflake ID)
+  
+  ```python
+  print(f"Role created: {role.created_at}")
+  ```
+</ResponseField>
+
+<ResponseField name="mention" type="str">
+  A string that mentions this role in a message
+  
+  ```python
+  await channel.send(f"Calling all {role.mention}!")  # <@&123456789>
+  ```
+</ResponseField>
+
+<ResponseField name="is_default" type="bool">
+  Whether this is the @everyone role (role ID equals guild ID)
+  
+  ```python
+  if role.is_default:
+      print("This is the @everyone role")
+  ```
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    guild_id: int | None = None,
+) -> Role
+```
+
+Construct a Role instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw role object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+<ParamField path="guild_id" type="int | None">
+  Guild ID (may not be in data for some endpoints)
+</ParamField>
+
+### edit
+
+```python
+async def edit(
+    *,
+    name: str | None = None,
+    permissions: int | None = None,
+    color: int | None = None,
+    hoist: bool | None = None,
+    mentionable: bool | None = None,
+    reason: str | None = None,
+) -> Role
+```
+
+Edit this role.
+
+<ParamField path="name" type="str | None">
+  New role name
+</ParamField>
+
+<ParamField path="permissions" type="int | None">
+  New permissions bitfield
+</ParamField>
+
+<ParamField path="color" type="int | None">
+  New color (RGB integer)
+</ParamField>
+
+<ParamField path="hoist" type="bool | None">
+  Whether to display role separately in member list
+</ParamField>
+
+<ParamField path="mentionable" type="bool | None">
+  Whether role can be mentioned
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Returns:** Updated `Role` object
+
+**Example:**
+```python
+# Change role name and color
+role = await role.edit(
+    name="Super Moderator",
+    color=0xFF0000,  # Red
+    reason="Role restructure"
+)
+
+# Make role mentionable
+role = await role.edit(mentionable=True)
+
+# Change permissions
+role = await role.edit(permissions=0x0000000008)  # Administrator permission
+```
+
+### delete
+
+```python
+async def delete(*, reason: str | None = None) -> None
+```
+
+Delete this role.
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await role.delete(reason="Role no longer needed")
+```
+
+## Usage Examples
+
+### Basic Role Management
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_ready():
+    guild = await client.fetch_guild(123456789)
+    
+    # Fetch all roles
+    roles = await guild.fetch_roles()
+    print("Guild roles:")
+    for role in sorted(roles, reverse=True):  # Sorted by position
+        print(f"  {role.name} (Position: {role.position})")
+    
+    # Create a new role
+    new_role = await guild.create_role(
+        name="Contributors",
+        color=0x5865F2,
+        hoist=True,
+        mentionable=True
+    )
+    print(f"Created role: {new_role.name}")
+
+client.run()
+```
+
+### Role Commands Bot
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if not message.guild_id:
+        return
+    
+    guild = await client.fetch_guild(message.guild_id)
+    
+    if message.content == "!roles":
+        # List all roles
+        roles = await guild.fetch_roles()
+        
+        embed = Embed(
+            title=f"Roles in {guild.name}",
+            description=f"Total: {len(roles)} roles",
+            color=0x5865F2
+        )
+        
+        # Sort by position (highest first)
+        sorted_roles = sorted(roles, reverse=True)
+        role_list = "\n".join([
+            f"{role.mention} - Position {role.position}"
+            for role in sorted_roles[:10]  # Show top 10
+        ])
+        
+        embed.add_field(
+            name="Top Roles",
+            value=role_list or "No roles",
+            inline=False
+        )
+        
+        await message.reply(embed=embed)
+    
+    elif message.content.startswith("!roleinfo"):
+        # Get info about a specific role
+        parts = message.content.split()
+        if len(parts) >= 2:
+            role_id = int(parts[1])
+            roles = await guild.fetch_roles()
+            role = next((r for r in roles if r.id == role_id), None)
+            
+            if role:
+                embed = Embed(
+                    title=f"Role: {role.name}",
+                    color=role.color or 0x99AAB5
+                )
+                
+                embed.add_field(name="ID", value=str(role.id), inline=True)
+                embed.add_field(name="Color", value=hex(role.color), inline=True)
+                embed.add_field(name="Position", value=str(role.position), inline=True)
+                embed.add_field(name="Hoisted", value="Yes" if role.hoist else "No", inline=True)
+                embed.add_field(name="Mentionable", value="Yes" if role.mentionable else "No", inline=True)
+                embed.add_field(name="Managed", value="Yes" if role.managed else "No", inline=True)
+                embed.add_field(name="Permissions", value=str(role.permissions), inline=False)
+                embed.add_field(name="Created", value=role.created_at.strftime("%Y-%m-%d"), inline=True)
+                
+                await message.reply(embed=embed)
+
+client.run()
+```
+
+### Auto-Role System
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+# Role ID to assign to new members
+NEW_MEMBER_ROLE_ID = 123456789
+
+@client.event
+async def on_member_join(member):
+    """Automatically assign a role to new members."""
+    
+    try:
+        # Add the new member role
+        await member.add_role(
+            NEW_MEMBER_ROLE_ID,
+            reason="Auto-role for new members"
+        )
+        
+        print(f"Assigned new member role to {member.display_name}")
+    except Exception as e:
+        print(f"Failed to assign role: {e}")
+
+client.run()
+```
+
+### Role Hierarchy Management
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!setup-roles":
+        if not message.guild_id:
+            return
+        
+        guild = await client.fetch_guild(message.guild_id)
+        
+        # Create a hierarchy of roles
+        admin_role = await guild.create_role(
+            name="Admin",
+            color=0xED4245,  # Red
+            permissions=0x0000000008,  # Administrator
+            hoist=True,
+            mentionable=True
+        )
+        
+        mod_role = await guild.create_role(
+            name="Moderator",
+            color=0x5865F2,  # Blurple
+            permissions=0x0000000020,  # Manage Messages
+            hoist=True,
+            mentionable=True
+        )
+        
+        member_role = await guild.create_role(
+            name="Member",
+            color=0x57F287,  # Green
+            hoist=False,
+            mentionable=False
+        )
+        
+        await message.reply(
+            f"Created roles:\n"
+            f"- {admin_role.mention}\n"
+            f"- {mod_role.mention}\n"
+            f"- {member_role.mention}"
+        )
+
+client.run()
+```
+
+### Permission Checker
+
+```python
+import fluxer
+from fluxer import Embed
+
+# Permission bit values
+PERMISSIONS = {
+    "ADMINISTRATOR": 0x0000000008,
+    "MANAGE_GUILD": 0x0000000020,
+    "MANAGE_ROLES": 0x0000000040,
+    "MANAGE_CHANNELS": 0x0000000010,
+    "KICK_MEMBERS": 0x0000000002,
+    "BAN_MEMBERS": 0x0000000004,
+    "MANAGE_MESSAGES": 0x0000002000,
+    "SEND_MESSAGES": 0x0000000800,
+    "READ_MESSAGES": 0x0000000400,
+}
+
+def has_permission(role, permission_name):
+    """Check if a role has a specific permission."""
+    permission_value = PERMISSIONS.get(permission_name, 0)
+    return (role.permissions & permission_value) == permission_value
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("!checkperms"):
+        if not message.guild_id:
+            return
+        
+        parts = message.content.split()
+        if len(parts) >= 2:
+            role_id = int(parts[1])
+            guild = await client.fetch_guild(message.guild_id)
+            roles = await guild.fetch_roles()
+            role = next((r for r in roles if r.id == role_id), None)
+            
+            if role:
+                embed = Embed(
+                    title=f"Permissions for {role.name}",
+                    color=role.color or 0x99AAB5
+                )
+                
+                perms = []
+                for perm_name in PERMISSIONS:
+                    if has_permission(role, perm_name):
+                        perms.append(f"✅ {perm_name}")
+                    else:
+                        perms.append(f"❌ {perm_name}")
+                
+                embed.add_field(
+                    name="Permissions",
+                    value="\n".join(perms),
+                    inline=False
+                )
+                
+                await message.reply(embed=embed)
+
+client.run()
+```
+
+## Color Reference
+
+Common role colors (as RGB integers):
+
+```python
+RED = 0xED4245
+ORANGE = 0xF26522
+YELLOW = 0xFEE75C
+GREEN = 0x57F287
+BLUE = 0x5865F2
+PURPLE = 0x9B59B6
+PINK = 0xEB459E
+WHITE = 0xFFFFFF
+BLACK = 0x000000
+GRAY = 0x99AAB5
+```
+
+## Important Notes
+
+### Role Hierarchy
+
+- Roles are ordered by their `position` field (higher = more important)
+- Users can only manage roles below their highest role
+- Bots can only assign roles below their highest role
+- The @everyone role always has position 0
+
+```python
+# Check if role A is higher than role B
+if role_a.position > role_b.position:
+    print("Role A is higher in the hierarchy")
+```
+
+### Managed Roles
+
+Managed roles are created and controlled by integrations:
+- Bot roles (when a bot joins)
+- Booster roles (for server boosters)
+- Integration roles
+
+You cannot delete or significantly modify managed roles.
+
+```python
+if role.managed:
+    print("This role is managed by an integration")
+```
+
+## Related Models
+
+- [Guild](/api/models/guild) - Guilds contain roles
+- [GuildMember](/api/models/member) - Members can have roles assigned
+- [Message](/api/models/message) - Roles can be mentioned in messages

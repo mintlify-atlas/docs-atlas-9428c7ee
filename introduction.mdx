@@ -1,0 +1,152 @@
+---
+title: Introduction
+description: A Python API wrapper for Fluxer - build bots and automated clients with a clean, type-safe, and event-driven architecture
+---
+
+## What is fluxer.py?
+
+fluxer.py is a Python API wrapper for [Fluxer](https://fluxer.app), a modern chat platform. It provides a clean, type-safe, and event-driven architecture for building bots and automated clients.
+
+Built with an async-first design on `asyncio`, fluxer.py makes it easy to create powerful bots with minimal boilerplate code.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Async-First Design" icon="bolt">
+    Built on `asyncio` for efficient concurrent operations
+  </Card>
+  <Card title="REST API Support" icon="globe">
+    Automatic rate limiting and retry logic
+  </Card>
+  <Card title="Real-Time Events" icon="satellite-dish">
+    WebSocket gateway for instant event notifications
+  </Card>
+  <Card title="Command Framework" icon="terminal">
+    Decorator-based commands with automatic parsing
+  </Card>
+  <Card title="Modular Cog System" icon="puzzle-piece">
+    Organize commands into reusable modules
+  </Card>
+  <Card title="Strongly Typed" icon="shield-check">
+    Type-safe data models for all Fluxer entities
+  </Card>
+</CardGroup>
+
+## Architecture
+
+fluxer.py is built with a layered architecture:
+
+- **`HTTPClient`** - Handles REST requests and rate limits
+- **`Gateway`** - Manages WebSocket connection and event dispatch
+- **`Client`** - Base event-driven interface
+- **`Bot`** - High-level command framework
+- **`Cog`** - Modular command grouping system
+
+## Bot vs Client
+
+<Note>
+  For most use cases, you should use `Bot`. Only use `Client` if you need low-level control or a custom command framework.
+</Note>
+
+### Use Bot When You Need
+
+- **Decorator-based commands** - Simple `@bot.command()` syntax
+- **Built-in command parsing** - Automatic argument parsing with type conversion
+- **Cog support** - Organize commands into modular groups
+- **Rapid development** - Get a bot running in minutes
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+bot.run("your_bot_token")
+```
+
+### Use Client When You Need
+
+- **Full event-driven control** - Handle raw gateway events
+- **Custom command framework** - Build your own command parser
+- **Lower-level API interaction** - Direct access to HTTP client
+- **Advanced implementations** - Custom caching, routing, or processing
+
+```python
+import fluxer
+
+client = fluxer.Client(intents=fluxer.Intents.default())
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user.username}")
+
+@client.event
+async def on_message(message):
+    if message.content == "ping":
+        await message.reply("Pong!")
+
+client.run("your_bot_token")
+```
+
+## Data Models
+
+fluxer.py provides strongly-typed models representing Fluxer entities:
+
+- `Guild` - Servers/communities
+- `Channel` - Text and voice channels
+- `Message` - Chat messages
+- `User` - User accounts
+- `GuildMember` - Users within a specific guild
+- `VoiceState` - Voice connection state
+- `Webhook` - Webhook integrations
+- `Embed` - Rich message embeds
+- `Emoji` - Custom emoji
+
+Each model encapsulates both state and behavior with convenience methods:
+
+```python
+# Send a message
+await channel.send("Hello, world!")
+
+# Reply to a message
+await message.reply("I got your message!")
+
+# Kick a member
+await guild.kick_member(member_id)
+```
+
+## Intents
+
+Intents determine which events your application receives from the WebSocket gateway:
+
+```python
+# Default intents (recommended for most bots)
+fluxer.Intents.default()
+
+# All intents (includes privileged intents)
+fluxer.Intents.all()
+```
+
+<Warning>
+  Using `Intents.default()` improves performance by subscribing only to necessary events.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install fluxer.py and set up your development environment
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first bot in minutes
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/client">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/akarealemil/fluxer.py/tree/main/examples">
+    View example bots and use cases
+  </Card>
+</CardGroup>

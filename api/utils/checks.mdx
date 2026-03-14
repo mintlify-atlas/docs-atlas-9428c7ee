@@ -1,0 +1,366 @@
+---
+title: Check Decorators
+description: Permission and role check decorators for command access control
+---
+
+## Overview
+
+The `fluxer.checks` module provides decorator functions for restricting command access based on roles and permissions.
+
+## Importing Checks
+
+```python
+import fluxer.checks
+from fluxer import Client
+
+bot = Client(token="your_token")
+```
+
+## has_role()
+
+Restrict a command to users who have a specific role.
+
+```python
+@fluxer.checks.has_role(name="Moderator")
+@fluxer.checks.has_role(id=987654321098765432)
+```
+
+### Parameters
+
+- `name` (str | None): Role name to require (case-sensitive)
+- `id` (int | str | None): Role ID to require
+
+<Note>
+You must provide either `name` or `id`, but not both.
+</Note>
+
+### Basic Usage
+
+#### Check by Role Name
+
+```python
+import fluxer.checks
+from fluxer import Client
+
+bot = Client(token="your_token")
+
+@bot.command()
+@fluxer.checks.has_role(name="Moderator")
+async def warn(ctx, member, *, reason):
+    """Warn a member (Moderator only)"""
+    await ctx.reply(f"Warning {member}: {reason}")
+```
+
+#### Check by Role ID
+
+```python
+@bot.command()
+@fluxer.checks.has_role(id=987654321098765432)
+async def secret(ctx):
+    """Secret command for special role"""
+    await ctx.reply("You found the secret command!")
+```
+
+### Behavior
+
+- If the user has the specified role, the command executes normally
+- If the user doesn't have the role, they receive: "You don't have permission to use this command."
+- If used in DMs, the user receives: "This command can only be used in a server."
+
+### Multiple Role Checks
+
+Stack multiple role checks to require any one of several roles:
+
+```python
+@bot.command()
+@fluxer.checks.has_role(name="Admin")
+async def admin_command(ctx):
+    """Admin only command"""
+    await ctx.reply("Admin command executed")
+
+@bot.command()
+@fluxer.checks.has_role(name="Moderator")
+async def mod_command(ctx):
+    """Moderator only command"""
+    await ctx.reply("Mod command executed")
+```
+
+<Warning>
+Role name matching is case-sensitive. "Moderator" and "moderator" are different.
+</Warning>
+
+## has_permission()
+
+Restrict a command to members who have specific permission(s).
+
+```python
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS)
+```
+
+### Parameters
+
+- `permission` (Permissions): A Permissions flag, or multiple flags combined with `|`
+
+### Basic Usage
+
+#### Single Permission
+
+```python
+import fluxer.checks
+from fluxer import Client
+from fluxer.enums import Permissions
+
+bot = Client(token="your_token")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+async def kick(ctx, member):
+    """Kick a member"""
+    await ctx.reply(f"Kicking {member}...")
+```
+
+#### Multiple Permissions
+
+Require multiple permissions using the bitwise OR operator (`|`):
+
+```python
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS)
+async def punish(ctx, member):
+    """Requires both KICK_MEMBERS and BAN_MEMBERS"""
+    await ctx.reply(f"Punishing {member}...")
+```
+
+### Permission Bypass Rules
+
+Certain users automatically bypass permission checks:
+
+1. **Guild Owner** - Always bypasses all permission checks
+2. **Administrator Permission** - Members with `ADMINISTRATOR` bypass all checks
+
+```python
+@bot.command()
+@fluxer.checks.has_permission(Permissions.MANAGE_CHANNELS)
+async def create_channel(ctx, name: str):
+    """Create a new channel"""
+    # Guild owner can use this even without MANAGE_CHANNELS
+    # Users with ADMINISTRATOR can also use this
+    await ctx.guild.create_channel(name=name)
+    await ctx.reply(f"Created channel: {name}")
+```
+
+### Behavior
+
+- If the user has the required permission(s), the command executes
+- If the user is the guild owner, the command always executes
+- If the user has `ADMINISTRATOR`, the command always executes
+- If the user lacks permissions, they receive: "You don't have permission to use this command."
+- If used in DMs, the user receives: "This command can only be used in a server."
+
+## Advanced Examples
+
+### Combining Role and Permission Checks
+
+You can stack both decorators to create complex access control:
+
+```python
+import fluxer.checks
+from fluxer import Client
+from fluxer.enums import Permissions
+
+bot = Client(token="your_token")
+
+@bot.command()
+@fluxer.checks.has_role(name="Senior Moderator")
+@fluxer.checks.has_permission(Permissions.BAN_MEMBERS)
+async def permaban(ctx, user_id: str):
+    """Permanently ban a user (Senior Mod with BAN_MEMBERS)"""
+    await ctx.reply(f"Permanently banning user {user_id}...")
+```
+
+<Note>
+When stacking decorators, the user must satisfy ALL conditions to execute the command.
+</Note>
+
+### Permission Check with Multiple Flags
+
+```python
+from fluxer.enums import Permissions
+import fluxer.checks
+
+# Text moderator permissions
+text_mod_perms = (
+    Permissions.MANAGE_MESSAGES |
+    Permissions.KICK_MEMBERS |
+    Permissions.SEND_MESSAGES
+)
+
+@bot.command()
+@fluxer.checks.has_permission(text_mod_perms)
+async def moderate(ctx):
+    """Text moderation command"""
+    await ctx.reply("You have text moderation permissions")
+```
+
+### Custom Error Handling
+
+Handle check failures with a custom error handler:
+
+```python
+from fluxer import Client
+from fluxer.enums import Permissions
+import fluxer.checks
+
+bot = Client(token="your_token")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.ADMINISTRATOR)
+async def admin_panel(ctx):
+    """Access admin panel"""
+    await ctx.reply("Opening admin panel...")
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors"""
+    # The checks send their own error messages
+    # but you can customize this behavior
+    if "don't have permission" in str(error).lower():
+        await ctx.reply("Access denied! Contact an administrator.")
+```
+
+### Hierarchical Permission System
+
+```python
+from fluxer.enums import Permissions
+import fluxer.checks
+
+# Different permission levels
+MOD_PERMS = Permissions.KICK_MEMBERS | Permissions.MANAGE_MESSAGES
+ADMIN_PERMS = MOD_PERMS | Permissions.BAN_MEMBERS | Permissions.MANAGE_CHANNELS
+OWNER_PERMS = ADMIN_PERMS | Permissions.ADMINISTRATOR
+
+@bot.command()
+@fluxer.checks.has_permission(MOD_PERMS)
+async def mod_action(ctx):
+    """Moderator level action"""
+    await ctx.reply("Mod action executed")
+
+@bot.command()
+@fluxer.checks.has_permission(ADMIN_PERMS)
+async def admin_action(ctx):
+    """Admin level action"""
+    await ctx.reply("Admin action executed")
+```
+
+### Working with Cogs
+
+The decorators work with both standalone commands and cog methods:
+
+```python
+from fluxer.ext import commands
+from fluxer.enums import Permissions
+import fluxer.checks
+
+class Moderation(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+    
+    @commands.command()
+    @fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+    async def kick(self, ctx, member):
+        """Kick a member"""
+        await ctx.reply(f"Kicking {member}...")
+    
+    @commands.command()
+    @fluxer.checks.has_role(name="Moderator")
+    async def warn(self, ctx, member, *, reason):
+        """Warn a member"""
+        await ctx.reply(f"Warning {member}: {reason}")
+
+def setup(bot):
+    bot.add_cog(Moderation(bot))
+```
+
+## Best Practices
+
+<Tip>
+**Use Permission Checks for Actions**
+
+Prefer `has_permission()` for commands that perform actions (kick, ban, delete messages), as permissions are more granular and flexible than roles.
+</Tip>
+
+<Tip>
+**Use Role Checks for Features**
+
+Use `has_role()` for feature access (special channels, custom commands), as roles represent user groups and responsibilities.
+</Tip>
+
+<Warning>
+**DM Commands**
+
+Both decorators prevent execution in DMs since roles and guild permissions don't exist there. Design your bot accordingly.
+</Warning>
+
+<Note>
+**Decorator Order**
+
+Place check decorators between `@bot.command()` and the function definition:
+
+```python
+@bot.command()        # First: command decorator
+@fluxer.checks.has_role(name="Admin")  # Then: checks
+async def my_command(ctx):  # Finally: function
+    pass
+```
+</Note>
+
+## Complete Example
+
+A moderation bot with role and permission checks:
+
+```python
+from fluxer import Client
+from fluxer.enums import Permissions, Intents
+import fluxer.checks
+
+intents = Intents.default() | Intents.GUILD_MEMBERS
+bot = Client(token="your_token", intents=intents)
+
+# Role-based command
+@bot.command()
+@fluxer.checks.has_role(name="Support Team")
+async def support(ctx):
+    """Access support panel (Support Team only)"""
+    await ctx.reply("Opening support panel...")
+
+# Permission-based commands
+@bot.command()
+@fluxer.checks.has_permission(Permissions.MANAGE_MESSAGES)
+async def clear(ctx, amount: int):
+    """Clear messages (requires MANAGE_MESSAGES)"""
+    await ctx.channel.purge(limit=amount)
+    await ctx.reply(f"Cleared {amount} messages")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+async def kick(ctx, member, *, reason="No reason provided"):
+    """Kick a member (requires KICK_MEMBERS)"""
+    await ctx.reply(f"Kicking {member} for: {reason}")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.BAN_MEMBERS)
+async def ban(ctx, member, *, reason="No reason provided"):
+    """Ban a member (requires BAN_MEMBERS)"""
+    await ctx.reply(f"Banning {member} for: {reason}")
+
+# Combined checks
+@bot.command()
+@fluxer.checks.has_role(name="Admin")
+@fluxer.checks.has_permission(Permissions.ADMINISTRATOR)
+async def config(ctx):
+    """Server configuration (Admin role + ADMINISTRATOR permission)"""
+    await ctx.reply("Opening configuration panel...")
+
+await bot.start()
+```

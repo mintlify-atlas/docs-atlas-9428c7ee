@@ -1,0 +1,369 @@
+---
+title: Utility Helpers
+description: Utility functions for working with Fluxer data types and formatting
+---
+
+## Overview
+
+The `fluxer.utils` module provides helpful utility functions for working with snowflake IDs, timestamps, markdown formatting, and more.
+
+## Snowflake Utilities
+
+Fluxer uses Snowflake IDs (like Discord) - 64-bit integers that encode a timestamp in the upper 42 bits.
+
+### FLUXER_EPOCH
+
+The Fluxer epoch constant: `1420070400000` (2015-01-01T00:00:00Z)
+
+```python
+from fluxer.utils import FLUXER_EPOCH
+
+print(FLUXER_EPOCH)  # 1420070400000
+```
+
+### snowflake_to_datetime()
+
+Convert a Fluxer Snowflake ID to a timezone-aware UTC datetime.
+
+```python
+from fluxer.utils import snowflake_to_datetime
+
+user_id = "123456789012345678"
+created_at = snowflake_to_datetime(user_id)
+
+print(f"User account created: {created_at}")
+# User account created: 2016-04-30 11:18:25.796000+00:00
+```
+
+#### Parameters
+
+- `snowflake` (str | int): The Snowflake ID as a string or integer
+
+#### Returns
+
+- `datetime`: A timezone-aware UTC datetime
+
+#### Example: Message Age
+
+```python
+from fluxer.utils import snowflake_to_datetime, utcnow
+from datetime import timedelta
+
+@bot.command()
+async def message_age(ctx, message_id: str):
+    """Check how old a message is"""
+    created = snowflake_to_datetime(message_id)
+    now = utcnow()
+    age = now - created
+    
+    await ctx.reply(f"That message is {age.total_seconds():.1f} seconds old")
+```
+
+### datetime_to_snowflake()
+
+Convert a datetime to a Snowflake ID. Useful for pagination with `before` and `after` parameters.
+
+```python
+from fluxer.utils import datetime_to_snowflake
+from datetime import datetime, timezone
+
+dt = datetime(2023, 1, 1, tzinfo=timezone.utc)
+snowflake = datetime_to_snowflake(dt)
+
+print(f"Snowflake: {snowflake}")
+# Snowflake: 1041379200000000000
+```
+
+#### Parameters
+
+- `dt` (datetime): A datetime object
+
+#### Returns
+
+- `int`: A Snowflake integer (only timestamp component is set)
+
+#### Example: Fetch Messages from Date Range
+
+```python
+from fluxer.utils import datetime_to_snowflake
+from datetime import datetime, timezone, timedelta
+
+@bot.command()
+async def messages_from_yesterday(ctx):
+    """Fetch all messages from yesterday"""
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(days=1)
+    two_days_ago = now - timedelta(days=2)
+    
+    after_id = datetime_to_snowflake(two_days_ago)
+    before_id = datetime_to_snowflake(yesterday)
+    
+    messages = await ctx.channel.get_history(
+        after=after_id,
+        before=before_id,
+        limit=100
+    )
+    
+    await ctx.reply(f"Found {len(messages)} messages from yesterday")
+```
+
+## Time Utilities
+
+### utcnow()
+
+Returns a timezone-aware UTC datetime representing the current time.
+
+```python
+from fluxer.utils import utcnow
+
+now = utcnow()
+print(now)  # 2024-03-14 12:34:56.789012+00:00
+```
+
+<Tip>
+Prefer `utcnow()` over `datetime.datetime.utcnow()` because it returns an aware datetime instead of a naive one.
+</Tip>
+
+#### Example: Track Command Usage Time
+
+```python
+from fluxer.utils import utcnow
+
+@bot.command()
+async def ping(ctx):
+    start = utcnow()
+    msg = await ctx.reply("Pong!")
+    end = utcnow()
+    
+    latency = (end - start).total_seconds() * 1000
+    await msg.edit(f"Pong! ({latency:.1f}ms)")
+```
+
+### format_dt()
+
+Format a datetime, int, or float (seconds) for presentation within Fluxer using Discord-style timestamp markdown.
+
+```python
+from fluxer.utils import format_dt, utcnow
+
+now = utcnow()
+formatted = format_dt(now, style="R")
+
+await ctx.reply(f"Current time: {formatted}")
+# Displays as: "Current time: in 0 seconds" (or relative time)
+```
+
+#### Parameters
+
+- `dt` (datetime | float): The datetime to format (or Unix timestamp in seconds)
+- `style` (str): The formatting style (default: `"f"`)
+
+#### Timestamp Styles
+
+| Style | Example Output | Description |
+|-------|----------------|-------------|
+| `t` | 22:57 | Short Time |
+| `T` | 22:57:58 | Long Time |
+| `d` | 17/05/2016 | Short Date |
+| `D` | 17 May 2016 | Long Date |
+| `f` | 17 May 2016 at 22:57 | Long Date, Short Time (default) |
+| `F` | Tuesday, 17 May 2016 at 22:57 | Full Date, Short Time |
+| `s` | 17/05/2016, 22:57 | Short Date, Short Time |
+| `S` | 17/05/2016, 22:57:58 | Short Date, Long Time |
+| `R` | 5 years ago | Relative Time |
+
+<Note>
+The exact output depends on the user's locale setting in their client. Examples use the `en-GB` locale.
+</Note>
+
+#### Example: Event Reminders
+
+```python
+from fluxer.utils import format_dt
+from datetime import datetime, timezone, timedelta
+
+@bot.command()
+async def remind(ctx, minutes: int, *, message: str):
+    """Set a reminder"""
+    remind_time = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    
+    await ctx.reply(
+        f"I'll remind you {format_dt(remind_time, 'R')}: {message}\n"
+        f"That's at {format_dt(remind_time, 'F')}"
+    )
+```
+
+## Markdown Utilities
+
+### escape_markdown()
+
+Escape markdown characters in text to prevent formatting.
+
+```python
+from fluxer.utils import escape_markdown
+
+text = "**bold** and _italic_"
+escaped = escape_markdown(text)
+
+print(escaped)  # \*\*bold\*\* and \_italic\_
+```
+
+#### Parameters
+
+- `text` (str): The text to escape
+- `as_needed` (bool): Escape only as needed (default: `False`)
+- `ignore_links` (bool): Leave links alone when escaping (default: `True`)
+
+#### Example: Display User Input Safely
+
+```python
+from fluxer.utils import escape_markdown
+
+@bot.command()
+async def say(ctx, *, message: str):
+    """Repeat a message (safely)"""
+    safe_message = escape_markdown(message)
+    await ctx.reply(safe_message)
+```
+
+### remove_markdown()
+
+Remove markdown characters from text.
+
+```python
+from fluxer.utils import remove_markdown
+
+text = "**bold** and _italic_ and [link](https://example.com)"
+plain = remove_markdown(text)
+
+print(plain)  # "bold and italic and https://example.com"
+```
+
+#### Parameters
+
+- `text` (str): The text to remove markdown from
+- `ignore_links` (bool): Leave links alone (default: `True`)
+
+<Warning>
+This function is not markdown-aware and may remove meaning from text. For example, `"10 * 5"` becomes `"10  5"`.
+</Warning>
+
+#### Example: Extract Plain Text
+
+```python
+from fluxer.utils import remove_markdown
+
+@bot.command()
+async def plain(ctx, *, message: str):
+    """Convert markdown to plain text"""
+    plain_text = remove_markdown(message)
+    await ctx.reply(f"Plain text: {plain_text}")
+```
+
+## Module Discovery
+
+### search_directory()
+
+Walk through a directory and yield all Python modules, useful for loading extensions.
+
+```python
+from fluxer.utils import search_directory
+
+for module_name in search_directory("./commands"):
+    print(module_name)
+    # commands.admin
+    # commands.fun
+    # commands.moderation
+```
+
+#### Parameters
+
+- `path` (str): The path to search for modules
+
+#### Yields
+
+- `str`: Module names usable with `bot.load_extension()`
+
+#### Example: Auto-load Extensions
+
+```python
+from fluxer import Client
+from fluxer.utils import search_directory
+
+bot = Client(token="your_token")
+
+# Load all extensions from the commands directory
+for extension in search_directory("./commands"):
+    try:
+        bot.load_extension(extension)
+        print(f"Loaded {extension}")
+    except Exception as e:
+        print(f"Failed to load {extension}: {e}")
+
+await bot.start()
+```
+
+<Note>
+The path must be within the current working directory. Modules outside the CWD require a package to be specified.
+</Note>
+
+## Complete Example
+
+Here's a comprehensive example using multiple utility functions:
+
+```python
+from fluxer import Client
+from fluxer.utils import (
+    snowflake_to_datetime,
+    datetime_to_snowflake,
+    utcnow,
+    format_dt,
+    escape_markdown,
+    search_directory
+)
+from datetime import timedelta
+
+bot = Client(token="your_token")
+
+@bot.command()
+async def userinfo(ctx, user_id: str):
+    """Get information about a user"""
+    # Get user creation time from snowflake
+    created = snowflake_to_datetime(user_id)
+    age = utcnow() - created
+    
+    # Format for display
+    created_formatted = format_dt(created, "F")
+    relative_time = format_dt(created, "R")
+    
+    await ctx.reply(
+        f"User created: {created_formatted}\n"
+        f"Account age: {relative_time}\n"
+        f"Days old: {age.days}"
+    )
+
+@bot.command()
+async def recent_messages(ctx, hours: int = 24):
+    """Fetch messages from the last N hours"""
+    cutoff = utcnow() - timedelta(hours=hours)
+    after_id = datetime_to_snowflake(cutoff)
+    
+    messages = await ctx.channel.get_history(after=after_id, limit=100)
+    
+    await ctx.reply(
+        f"Found {len(messages)} messages in the last {hours} hours\n"
+        f"Since: {format_dt(cutoff, 'F')}"
+    )
+
+@bot.command()
+async def echo(ctx, *, text: str):
+    """Safely echo user input"""
+    safe_text = escape_markdown(text)
+    await ctx.reply(safe_text)
+
+# Load all extensions
+for ext in search_directory("./cogs"):
+    bot.load_extension(ext)
+
+await bot.start()
+```

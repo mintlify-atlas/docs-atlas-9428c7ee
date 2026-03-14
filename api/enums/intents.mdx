@@ -1,0 +1,151 @@
+---
+title: Intents
+description: Gateway intents control which events your bot receives from the Fluxer gateway
+---
+
+## Overview
+
+Intents are bitflags that tell the gateway which events you want to receive. Some intents are privileged and require approval from Fluxer.
+
+## Intents Class
+
+```python
+from fluxer.enums import Intents
+```
+
+The `Intents` class is an `IntFlag` enum that allows you to combine multiple intents using bitwise operators.
+
+## Intent Flags
+
+All available intent flags:
+
+| Intent | Value | Description |
+|--------|-------|-------------|
+| `GUILDS` | `1 << 0` | Guild creation, updates, deletion |
+| `GUILD_MEMBERS` | `1 << 1` | Guild member events (privileged) |
+| `GUILD_MODERATION` | `1 << 2` | Bans, kicks, and moderation events |
+| `GUILD_EMOJIS_AND_STICKERS` | `1 << 3` | Emoji and sticker updates |
+| `GUILD_INTEGRATIONS` | `1 << 4` | Integration updates |
+| `GUILD_WEBHOOKS` | `1 << 5` | Webhook updates |
+| `GUILD_INVITES` | `1 << 6` | Invite creation and deletion |
+| `GUILD_VOICE_STATES` | `1 << 7` | Voice state updates |
+| `GUILD_PRESENCES` | `1 << 8` | Presence updates (privileged) |
+| `GUILD_MESSAGES` | `1 << 9` | Guild message events |
+| `GUILD_MESSAGE_REACTIONS` | `1 << 10` | Reaction events in guilds |
+| `GUILD_MESSAGE_TYPING` | `1 << 11` | Typing indicators in guilds |
+| `DIRECT_MESSAGES` | `1 << 12` | Direct message events |
+| `DIRECT_MESSAGE_REACTIONS` | `1 << 13` | Reaction events in DMs |
+| `DIRECT_MESSAGE_TYPING` | `1 << 14` | Typing indicators in DMs |
+| `MESSAGE_CONTENT` | `1 << 15` | Message content (privileged) |
+
+## Privileged Intents
+
+The following intents require explicit approval:
+- `GUILD_MEMBERS`
+- `GUILD_PRESENCES`
+- `MESSAGE_CONTENT`
+
+## Methods
+
+### Intents.default()
+
+Returns a sensible default set of intents that excludes privileged ones.
+
+```python
+intents = Intents.default()
+```
+
+This includes all intents except:
+- `GUILD_MEMBERS`
+- `GUILD_PRESENCES`
+- `MESSAGE_CONTENT`
+
+### Intents.all()
+
+Returns all intents enabled, including privileged ones.
+
+```python
+intents = Intents.all()
+```
+
+<Warning>
+Using `Intents.all()` requires that all privileged intents are enabled for your bot in the Fluxer developer portal.
+</Warning>
+
+### Intents.none()
+
+Returns no intents (value of 0).
+
+```python
+intents = Intents.none()
+```
+
+## Usage Examples
+
+### Basic Usage
+
+Combine specific intents:
+
+```python
+from fluxer import Client
+from fluxer.enums import Intents
+
+# Combine specific intents
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES
+
+bot = Client(token="your_token", intents=intents)
+```
+
+### Using Default Intents
+
+Start with default intents and add specific ones:
+
+```python
+from fluxer import Client
+from fluxer.enums import Intents
+
+# Default intents + MESSAGE_CONTENT
+intents = Intents.default() | Intents.MESSAGE_CONTENT
+
+bot = Client(token="your_token", intents=intents)
+```
+
+### Removing Intents
+
+Start with all intents and remove specific ones:
+
+```python
+from fluxer import Client
+from fluxer.enums import Intents
+
+# All intents except typing indicators
+intents = Intents.all() & ~Intents.GUILD_MESSAGE_TYPING
+
+bot = Client(token="your_token", intents=intents)
+```
+
+### Checking Intents
+
+Check if specific intents are enabled:
+
+```python
+intents = Intents.default()
+
+# Check if GUILDS is enabled
+if Intents.GUILDS in intents:
+    print("Guild events are enabled")
+
+# Check using bitwise AND
+if intents & Intents.GUILD_MESSAGES:
+    print("Guild message events are enabled")
+```
+
+## Best Practices
+
+<Tip>
+Only request the intents your bot actually needs. This reduces bandwidth and improves performance.
+</Tip>
+
+<Warning>
+Privileged intents require verification if your bot is in over 100 guilds. Plan accordingly.
+</Warning>

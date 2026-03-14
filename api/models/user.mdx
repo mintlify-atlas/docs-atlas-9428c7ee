@@ -1,0 +1,285 @@
+---
+title: User
+description: Represents a Fluxer user
+---
+
+## Overview
+
+The `User` class represents a Fluxer user account. It contains identity information and provides methods for direct messaging and user interactions.
+
+## Class Definition
+
+```python
+from fluxer.models import User
+
+@dataclass(slots=True)
+class User:
+    """Represents a Fluxer user."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the user
+</ResponseField>
+
+<ResponseField name="username" type="str" required>
+  The user's username
+</ResponseField>
+
+<ResponseField name="discriminator" type="str | None">
+  The user's discriminator (e.g., "0001")
+</ResponseField>
+
+<ResponseField name="global_name" type="str | None">
+  The user's display name/nickname
+</ResponseField>
+
+<ResponseField name="avatar_hash" type="str | None">
+  The hash of the user's avatar
+</ResponseField>
+
+<ResponseField name="avatar_color" type="str | None">
+  The user's avatar color
+</ResponseField>
+
+<ResponseField name="bot" type="bool" default="False">
+  Whether the user is a bot
+</ResponseField>
+
+<ResponseField name="flags" type="int" default="0">
+  User flags bitfield
+</ResponseField>
+
+<ResponseField name="bio" type="str | None">
+  The user's bio/about me text (only available when fetching your own user via GET /users/@me)
+</ResponseField>
+
+<ResponseField name="banner_hash" type="str | None">
+  Banner image hash (only available via GET /users/@me)
+</ResponseField>
+
+<ResponseField name="banner_color" type="int | None">
+  Banner color as integer (only available via GET /users/@me)
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="created_at" type="datetime">
+  When this user account was created (derived from snowflake ID)
+  
+  ```python
+  user = await client.fetch_user(123456789)
+  print(f"Account created: {user.created_at}")
+  ```
+</ResponseField>
+
+<ResponseField name="display_name" type="str">
+  The best display name for this user. Returns `global_name` if set, otherwise falls back to `username`.
+  
+  ```python
+  print(f"Hello, {user.display_name}!")
+  ```
+</ResponseField>
+
+<ResponseField name="mention" type="str">
+  A string that mentions this user in a message
+  
+  ```python
+  await channel.send(f"Hello {user.mention}!")  # <@123456789>
+  ```
+</ResponseField>
+
+<ResponseField name="avatar_url" type="str | None">
+  URL for the user's avatar, or None if they use the default. Automatically detects animated avatars.
+  
+  ```python
+  if user.avatar_url:
+      print(f"Avatar: {user.avatar_url}")
+  ```
+</ResponseField>
+
+<ResponseField name="default_avatar_url" type="str">
+  URL for the user's default avatar (always available)
+  
+  ```python
+  avatar = user.avatar_url or user.default_avatar_url
+  ```
+</ResponseField>
+
+<ResponseField name="banner_url" type="str | None">
+  URL for the user's banner, or None if they don't have one. Automatically detects animated banners.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> User
+```
+
+Construct a User instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw user object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+### create_dm
+
+```python
+async def create_dm() -> Channel
+```
+
+Open a DM channel with this user. Returns the existing DM channel if one is already open.
+
+**Returns:** The `Channel` object for the DM
+
+**Example:**
+```python
+user = await client.fetch_user(123456789)
+dm_channel = await user.create_dm()
+print(f"DM channel ID: {dm_channel.id}")
+```
+
+### send
+
+```python
+async def send(
+    content: str | None = None,
+    *,
+    embed: Embed | None = None,
+    embeds: list[Embed] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a DM to this user. Opens a DM channel, then sends the message.
+
+<ParamField path="content" type="str | None">
+  The message content
+</ParamField>
+
+<ParamField path="embed" type="Embed | None">
+  A single embed to include
+</ParamField>
+
+<ParamField path="embeds" type="list[Embed] | None">
+  Multiple embeds to include
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach
+</ParamField>
+
+**Returns:** The sent `Message` object
+
+**Example:**
+```python
+from fluxer import Embed
+
+# Send a simple DM
+await user.send("Hello!")
+
+# Send with an embed
+embed = Embed(
+    title="Welcome!",
+    description="Thanks for joining our server",
+    color=0x5865F2
+)
+await user.send(embed=embed)
+
+# Send with a file
+from fluxer import File
+await user.send("Here's your data", file=File("data.json"))
+```
+
+## Usage Example
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user}")
+    print(f"User ID: {client.user.id}")
+    print(f"Created: {client.user.created_at}")
+
+@client.event
+async def on_message(message):
+    # Check if author is a bot
+    if message.author.bot:
+        return
+    
+    if message.content == "!userinfo":
+        user = message.author
+        
+        # Create an embed with user info
+        embed = Embed(
+            title=f"User: {user.display_name}",
+            color=0x5865F2
+        )
+        embed.add_field(name="Username", value=user.username)
+        embed.add_field(name="ID", value=str(user.id))
+        embed.add_field(name="Bot", value="Yes" if user.bot else "No")
+        embed.add_field(
+            name="Account Created",
+            value=user.created_at.strftime("%Y-%m-%d"),
+            inline=False
+        )
+        
+        # Set avatar as thumbnail
+        if user.avatar_url:
+            embed.set_thumbnail(url=user.avatar_url)
+        
+        await message.reply(embed=embed)
+    
+    elif message.content == "!dm":
+        # Send a DM to the message author
+        try:
+            await message.author.send(
+                "This is a direct message from the bot!"
+            )
+            await message.reply("Check your DMs!")
+        except Exception as e:
+            await message.reply(f"Couldn't send DM: {e}")
+
+client.run()
+```
+
+## Important Notes
+
+### Profile Fields Availability
+
+Some fields like `bio`, `banner_hash`, and `banner_color` are ONLY available when fetching your own user via `GET /users/@me`. They are not available when fetching other users via `GET /users/{user_id}` or in guild member objects.
+
+```python
+# These fields are available
+my_user = await client.fetch_user("@me")
+print(my_user.bio)  # Available
+print(my_user.banner_url)  # Available
+
+# These fields are NOT available
+other_user = await client.fetch_user(123456789)
+print(other_user.bio)  # None (not included in response)
+```
+
+## Related Models
+
+- [GuildMember](/api/models/member) - Represents a user in a guild context
+- [Message](/api/models/message) - Messages have a User as the author
+- [Channel](/api/models/channel) - DM channels for direct messaging

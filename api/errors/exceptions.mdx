@@ -1,0 +1,346 @@
+---
+title: Exceptions
+description: Exception classes for error handling in fluxer.py
+---
+
+## Overview
+
+The fluxer.py library defines a hierarchy of exceptions for different types of errors that can occur when interacting with the Fluxer API.
+
+## Exception Hierarchy
+
+```
+FluxerException (base)
+├── HTTPException
+│   ├── BadRequest (400)
+│   ├── Unauthorized (401)
+│   ├── Forbidden (403)
+│   ├── NotFound (404)
+│   └── RateLimited (429)
+├── GatewayException
+│   ├── GatewayNotConnected
+│   ├── ReconnectRequested
+│   └── SessionInvalid
+└── LoginFailure
+```
+
+## Base Exception
+
+### FluxerException
+
+Base exception for all fluxer.py errors.
+
+```python
+from fluxer.errors import FluxerException
+
+try:
+    # Fluxer operations
+    await bot.start()
+except FluxerException as e:
+    print(f"A Fluxer error occurred: {e}")
+```
+
+All fluxer.py exceptions inherit from `FluxerException`, allowing you to catch any library-specific error.
+
+## HTTP Exceptions
+
+### HTTPException
+
+Raised when an HTTP request to the Fluxer API fails.
+
+```python
+from fluxer.errors import HTTPException
+```
+
+#### Attributes
+
+- `status` (int): HTTP status code
+- `code` (str): Fluxer error code
+- `message` (str): Error message
+- `errors` (list[dict]): List of validation errors (if any)
+
+#### Example
+
+```python
+from fluxer.errors import HTTPException
+
+try:
+    message = await channel.send("Hello!")
+except HTTPException as e:
+    print(f"HTTP {e.status}: {e.message}")
+    print(f"Error code: {e.code}")
+    if e.errors:
+        print(f"Validation errors: {e.errors}")
+```
+
+### BadRequest
+
+400 Bad Request - Invalid input provided to the API.
+
+```python
+from fluxer.errors import BadRequest
+
+try:
+    await channel.send("")  # Empty message
+except BadRequest as e:
+    print(f"Invalid request: {e.message}")
+```
+
+Common causes:
+- Invalid parameter values
+- Missing required fields
+- Malformed request data
+
+### Unauthorized
+
+401 Unauthorized - Bad or missing authentication token.
+
+```python
+from fluxer.errors import Unauthorized
+
+try:
+    await bot.start()
+except Unauthorized:
+    print("Invalid bot token - check your credentials")
+```
+
+This typically indicates:
+- Invalid bot token
+- Expired token
+- Missing authorization header
+
+### Forbidden
+
+403 Forbidden - Missing permissions to perform the action.
+
+```python
+from fluxer.errors import Forbidden
+
+try:
+    await member.ban(reason="Spam")
+except Forbidden:
+    print("Bot lacks permission to ban members")
+```
+
+Common causes:
+- Bot missing required permissions
+- Attempting to modify a user with higher role
+- Channel-specific permission denial
+
+### NotFound
+
+404 Not Found - The requested resource doesn't exist.
+
+```python
+from fluxer.errors import NotFound
+
+try:
+    message = await channel.get_message("invalid_id")
+except NotFound:
+    print("Message not found")
+```
+
+Common causes:
+- Invalid resource ID
+- Resource was deleted
+- Bot doesn't have access to the resource
+
+### RateLimited
+
+429 Too Many Requests - Rate limit exceeded.
+
+```python
+from fluxer.errors import RateLimited
+import asyncio
+
+try:
+    for i in range(100):
+        await channel.send(f"Message {i}")
+except RateLimited as e:
+    print(f"Rate limited! Retry after {e.retry_after} seconds")
+    await asyncio.sleep(e.retry_after)
+```
+
+#### Attributes
+
+- `retry_after` (float): Number of seconds to wait before retrying
+
+<Warning>
+Always respect the `retry_after` value. Ignoring rate limits can result in your bot being temporarily or permanently banned.
+</Warning>
+
+## Gateway Exceptions
+
+### GatewayException
+
+Base exception for gateway/WebSocket errors.
+
+```python
+from fluxer.errors import GatewayException
+
+try:
+    await bot.update_presence(status="online")
+except GatewayException as e:
+    print(f"Gateway error: {e}")
+```
+
+### GatewayNotConnected
+
+Raised when trying to use the gateway before it's connected.
+
+```python
+from fluxer.errors import GatewayNotConnected
+
+try:
+    await bot.change_presence(status="dnd")
+except GatewayNotConnected:
+    print("Bot is not connected to the gateway yet")
+```
+
+This occurs when:
+- Attempting gateway operations before `bot.start()` completes
+- Gateway connection was lost
+- Bot is shutting down
+
+### ReconnectRequested
+
+The gateway has requested that the client reconnect.
+
+```python
+from fluxer.errors import ReconnectRequested
+
+try:
+    # Gateway operations
+    pass
+except ReconnectRequested:
+    print("Gateway requested reconnection")
+    await bot.reconnect()
+```
+
+This is typically handled automatically by the library.
+
+### SessionInvalid
+
+The session is invalid and cannot be resumed.
+
+```python
+from fluxer.errors import SessionInvalid
+
+try:
+    # Resume session
+    await bot.resume()
+except SessionInvalid as e:
+    print(f"Session invalid (resumable={e.resumable})")
+    if not e.resumable:
+        print("Starting new session...")
+        await bot.identify()
+```
+
+#### Attributes
+
+- `resumable` (bool): Whether the session can potentially be resumed
+
+## Client Exceptions
+
+### LoginFailure
+
+Raised when the bot token is invalid during login.
+
+```python
+from fluxer.errors import LoginFailure
+
+try:
+    await bot.start()
+except LoginFailure:
+    print("Failed to login - invalid bot token")
+```
+
+This is a fatal error that requires:
+- Verifying the bot token
+- Checking if the bot was deleted
+- Ensuring the token hasn't been regenerated
+
+## Error Handling Best Practices
+
+### Specific Exception Handling
+
+Handle specific exceptions for better error recovery:
+
+```python
+from fluxer.errors import Forbidden, NotFound, HTTPException
+
+try:
+    await message.delete()
+except Forbidden:
+    await ctx.reply("I don't have permission to delete that message")
+except NotFound:
+    await ctx.reply("That message doesn't exist anymore")
+except HTTPException as e:
+    await ctx.reply(f"An error occurred: {e.message}")
+```
+
+### Retry Logic
+
+Implement retry logic for transient errors:
+
+```python
+import asyncio
+from fluxer.errors import RateLimited, HTTPException
+
+async def send_with_retry(channel, content, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return await channel.send(content)
+        except RateLimited as e:
+            if attempt < max_retries - 1:
+                await asyncio.sleep(e.retry_after)
+            else:
+                raise
+        except HTTPException as e:
+            if e.status >= 500 and attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            else:
+                raise
+```
+
+### Global Error Handler
+
+Implement a global error handler for commands:
+
+```python
+from fluxer import Client
+from fluxer.errors import (
+    Forbidden,
+    NotFound,
+    RateLimited,
+    HTTPException,
+    FluxerException
+)
+
+bot = Client(token="your_token")
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, Forbidden):
+        await ctx.reply("I don't have permission to do that.")
+    elif isinstance(error, NotFound):
+        await ctx.reply("Couldn't find that resource.")
+    elif isinstance(error, RateLimited):
+        await ctx.reply(f"Slow down! Try again in {error.retry_after:.1f}s")
+    elif isinstance(error, HTTPException):
+        await ctx.reply(f"API error: {error.message}")
+    elif isinstance(error, FluxerException):
+        await ctx.reply(f"An error occurred: {str(error)}")
+    else:
+        # Not a Fluxer error
+        print(f"Unexpected error: {error}")
+        raise
+```
+
+<Tip>
+Always catch the most specific exception first, then broader exceptions as fallbacks.
+</Tip>
+
+<Note>
+The library automatically handles most gateway errors internally. You typically only need to handle HTTP exceptions in your bot code.
+</Note>

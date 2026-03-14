@@ -1,0 +1,410 @@
+---
+title: Embed
+description: Builder for rich embed objects
+---
+
+## Overview
+
+The `Embed` class is a builder for creating rich embed objects in Fluxer messages. Embeds allow you to display formatted content with titles, descriptions, fields, images, and more.
+
+## Class Definition
+
+```python
+from fluxer.models import Embed
+
+@dataclass
+class Embed:
+    """Builder for rich embed objects."""
+```
+
+## Properties
+
+<ResponseField name="title" type="str | None">
+  The title of the embed
+</ResponseField>
+
+<ResponseField name="description" type="str | None">
+  The description/body text of the embed
+</ResponseField>
+
+<ResponseField name="url" type="str | None">
+  URL that the title links to
+</ResponseField>
+
+<ResponseField name="color" type="int | None">
+  Color of the embed sidebar (RGB integer)
+</ResponseField>
+
+<ResponseField name="timestamp" type="str | None">
+  ISO 8601 timestamp to display in the footer
+</ResponseField>
+
+<ResponseField name="footer" type="dict[str, Any] | None">
+  Footer information (text and optional icon_url)
+</ResponseField>
+
+<ResponseField name="image" type="dict[str, Any] | None">
+  Image to display (url)
+</ResponseField>
+
+<ResponseField name="thumbnail" type="dict[str, Any] | None">
+  Thumbnail image to display (url)
+</ResponseField>
+
+<ResponseField name="author" type="dict[str, Any] | None">
+  Author information (name, url, icon_url)
+</ResponseField>
+
+<ResponseField name="fields" type="list[dict[str, Any]]" default="[]">
+  List of field objects (name, value, inline)
+</ResponseField>
+
+## Methods
+
+### set_footer
+
+```python
+def set_footer(*, text: str, icon_url: str | None = None) -> Embed
+```
+
+Set the footer of the embed.
+
+<ParamField path="text" type="str" required>
+  Footer text
+</ParamField>
+
+<ParamField path="icon_url" type="str | None">
+  URL for footer icon
+</ParamField>
+
+**Returns:** Self (for method chaining)
+
+**Example:**
+```python
+embed.set_footer(text="Powered by Fluxer", icon_url="https://example.com/icon.png")
+```
+
+### set_image
+
+```python
+def set_image(*, url: str) -> Embed
+```
+
+Set the main image of the embed.
+
+<ParamField path="url" type="str" required>
+  Image URL
+</ParamField>
+
+**Returns:** Self (for method chaining)
+
+**Example:**
+```python
+embed.set_image(url="https://example.com/image.png")
+```
+
+### set_thumbnail
+
+```python
+def set_thumbnail(*, url: str) -> Embed
+```
+
+Set the thumbnail image of the embed.
+
+<ParamField path="url" type="str" required>
+  Thumbnail URL
+</ParamField>
+
+**Returns:** Self (for method chaining)
+
+**Example:**
+```python
+embed.set_thumbnail(url="https://example.com/thumb.png")
+```
+
+### set_author
+
+```python
+def set_author(
+    *,
+    name: str,
+    url: str | None = None,
+    icon_url: str | None = None
+) -> Embed
+```
+
+Set the author of the embed.
+
+<ParamField path="name" type="str" required>
+  Author name
+</ParamField>
+
+<ParamField path="url" type="str | None">
+  URL that the author name links to
+</ParamField>
+
+<ParamField path="icon_url" type="str | None">
+  URL for author icon
+</ParamField>
+
+**Returns:** Self (for method chaining)
+
+**Example:**
+```python
+embed.set_author(
+    name="Bot Name",
+    url="https://example.com",
+    icon_url="https://example.com/bot.png"
+)
+```
+
+### add_field
+
+```python
+def add_field(*, name: str, value: str, inline: bool = False) -> Embed
+```
+
+Add a field to the embed.
+
+<ParamField path="name" type="str" required>
+  Field name/title
+</ParamField>
+
+<ParamField path="value" type="str" required>
+  Field value/content
+</ParamField>
+
+<ParamField path="inline" type="bool" default="False">
+  Whether to display the field inline
+</ParamField>
+
+**Returns:** Self (for method chaining)
+
+**Example:**
+```python
+embed.add_field(name="Field 1", value="Value 1", inline=True)
+embed.add_field(name="Field 2", value="Value 2", inline=True)
+embed.add_field(name="Full Width", value="This field spans the full width", inline=False)
+```
+
+### to_dict
+
+```python
+def to_dict() -> dict[str, Any]
+```
+
+Serialize the embed to a dict suitable for the API.
+
+**Returns:** Dictionary representation of the embed
+
+## Usage Examples
+
+### Basic Embed
+
+```python
+from fluxer import Embed
+
+# Create a simple embed
+embed = Embed(
+    title="Hello, World!",
+    description="This is a basic embed",
+    color=0x5865F2  # Blurple color
+)
+
+await channel.send(embed=embed)
+```
+
+### Embed with Fields
+
+```python
+embed = Embed(
+    title="Server Statistics",
+    description="Current server stats",
+    color=0x00FF00
+)
+
+embed.add_field(name="Members", value="1,234", inline=True)
+embed.add_field(name="Online", value="567", inline=True)
+embed.add_field(name="Channels", value="42", inline=True)
+
+await channel.send(embed=embed)
+```
+
+### Complete Embed
+
+```python
+from datetime import datetime
+
+embed = Embed(
+    title="User Information",
+    description="Detailed user profile",
+    url="https://example.com/profile",
+    color=0x5865F2,
+    timestamp=datetime.utcnow().isoformat()
+)
+
+embed.set_author(
+    name="Profile Bot",
+    icon_url="https://example.com/bot-icon.png"
+)
+
+embed.set_thumbnail(url="https://example.com/avatar.png")
+
+embed.add_field(name="Username", value="CoolUser123", inline=True)
+embed.add_field(name="ID", value="123456789", inline=True)
+embed.add_field(name="Joined", value="2024-01-01", inline=True)
+
+embed.add_field(
+    name="About",
+    value="This is a bio that spans the full width",
+    inline=False
+)
+
+embed.set_image(url="https://example.com/banner.png")
+
+embed.set_footer(
+    text="Requested by User",
+    icon_url="https://example.com/user-icon.png"
+)
+
+await channel.send(embed=embed)
+```
+
+### Multiple Embeds
+
+```python
+embed1 = Embed(title="Embed 1", description="First embed", color=0xFF0000)
+embed2 = Embed(title="Embed 2", description="Second embed", color=0x00FF00)
+
+# Send multiple embeds in one message
+await channel.send(embeds=[embed1, embed2])
+```
+
+### Method Chaining
+
+```python
+embed = (Embed(title="Chained Embed", color=0x5865F2)
+    .set_author(name="Bot Name")
+    .add_field(name="Field 1", value="Value 1")
+    .add_field(name="Field 2", value="Value 2")
+    .set_footer(text="Footer text")
+)
+
+await channel.send(embed=embed)
+```
+
+### Interactive Bot Example
+
+```python
+import fluxer
+from fluxer import Embed
+from datetime import datetime
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!help":
+        embed = Embed(
+            title="Bot Commands",
+            description="Here are all available commands",
+            color=0x5865F2,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+        embed.set_author(
+            name="Help System",
+            icon_url=client.user.avatar_url
+        )
+        
+        embed.add_field(
+            name="!help",
+            value="Display this help message",
+            inline=False
+        )
+        embed.add_field(
+            name="!ping",
+            value="Check bot latency",
+            inline=False
+        )
+        embed.add_field(
+            name="!info",
+            value="Get bot information",
+            inline=False
+        )
+        
+        embed.set_footer(text=f"Requested by {message.author.display_name}")
+        
+        await message.reply(embed=embed)
+    
+    elif message.content == "!serverinfo":
+        if not message.guild_id:
+            return
+        
+        guild = await client.fetch_guild(message.guild_id)
+        
+        embed = Embed(
+            title=guild.name,
+            description=f"Server ID: {guild.id}",
+            color=0x00FF00
+        )
+        
+        if guild.icon_url:
+            embed.set_thumbnail(url=guild.icon_url)
+        
+        embed.add_field(
+            name="Owner",
+            value=f"<@{guild.owner_id}>",
+            inline=True
+        )
+        embed.add_field(
+            name="Members",
+            value=str(guild.member_count or "Unknown"),
+            inline=True
+        )
+        embed.add_field(
+            name="Created",
+            value=guild.created_at.strftime("%Y-%m-%d"),
+            inline=True
+        )
+        
+        await message.reply(embed=embed)
+
+client.run()
+```
+
+## Color Reference
+
+Common color values (as RGB integers):
+
+```python
+# Brand colors
+BLURPLE = 0x5865F2
+GREEN = 0x57F287
+YELLOW = 0xFEE75C
+FUCHSIA = 0xEB459E
+RED = 0xED4245
+
+# Standard colors
+WHITE = 0xFFFFFF
+BLACK = 0x000000
+
+# Usage
+embed = Embed(title="Success", color=0x57F287)
+```
+
+## Limits
+
+- **Title**: Up to 256 characters
+- **Description**: Up to 4096 characters
+- **Fields**: Up to 25 fields
+- **Field Name**: Up to 256 characters
+- **Field Value**: Up to 1024 characters
+- **Footer Text**: Up to 2048 characters
+- **Author Name**: Up to 256 characters
+- **Total Characters**: Up to 6000 characters across all fields
+
+## Related Models
+
+- [Message](/api/models/message) - Messages can contain embeds
+- [Channel](/api/models/channel) - Channels where embeds are sent

@@ -1,0 +1,167 @@
+---
+title: Permissions
+description: Permission bitfield flags for guild roles and channel overwrites
+---
+
+## Overview
+
+The `Permissions` enum represents permission bitfield flags used for guild roles and channel overwrites. Each permission maps to a single bit in the permission integer.
+
+## Permissions Class
+
+```python
+from fluxer.enums import Permissions
+```
+
+The `Permissions` class is an `IntFlag` enum that allows you to combine multiple permissions using bitwise operators.
+
+## Permission Flags
+
+### General Permissions
+
+| Permission | Value | Description |
+|------------|-------|-------------|
+| `CREATE_INVITE` | `1 << 0` | Create instant invites |
+| `KICK_MEMBERS` | `1 << 1` | Kick members from the guild |
+| `BAN_MEMBERS` | `1 << 2` | Ban members from the guild |
+| `ADMINISTRATOR` | `1 << 3` | All permissions (bypasses all checks) |
+| `MANAGE_CHANNELS` | `1 << 4` | Create, edit, delete channels |
+| `MANAGE_GUILD` | `1 << 5` | Manage guild settings |
+| `ADD_REACTIONS` | `1 << 6` | Add reactions to messages |
+| `VIEW_AUDIT_LOG` | `1 << 7` | View the audit log |
+| `PRIORITY_SPEAKER` | `1 << 8` | Priority speaker in voice |
+| `STREAM` | `1 << 9` | Stream in voice channels |
+| `VIEW_CHANNEL` | `1 << 10` | View channels |
+| `SEND_MESSAGES` | `1 << 11` | Send messages in channels |
+| `SEND_TTS_MESSAGES` | `1 << 12` | Send text-to-speech messages |
+| `MANAGE_MESSAGES` | `1 << 13` | Delete and pin messages |
+| `EMBED_LINKS` | `1 << 14` | Embed links in messages |
+| `ATTACH_FILES` | `1 << 15` | Attach files to messages |
+| `READ_MESSAGE_HISTORY` | `1 << 16` | Read message history |
+| `MENTION_EVERYONE` | `1 << 17` | Mention @everyone and @here |
+| `USE_EXTERNAL_EMOJIS` | `1 << 18` | Use emojis from other guilds |
+| `USE_EXTERNAL_STICKERS` | `1 << 33` | Use stickers from other guilds |
+| `MODERATE_MEMBERS` | `1 << 40` | Timeout members |
+| `CREATE_EXPRESSIONS` | `1 << 43` | Create emojis and stickers |
+| `PIN_MESSAGES` | `1 << 51` | Pin messages |
+| `BYPASS_SLOWMODE` | `1 << 52` | Bypass slowmode restrictions |
+| `UPDATE_RTC_REGION` | `1 << 53` | Update voice channel region |
+
+### Voice Permissions
+
+| Permission | Value | Description |
+|------------|-------|-------------|
+| `CONNECT` | `1 << 20` | Connect to voice channels |
+| `SPEAK` | `1 << 21` | Speak in voice channels |
+| `MUTE_MEMBERS` | `1 << 22` | Mute members in voice |
+| `DEAFEN_MEMBERS` | `1 << 23` | Deafen members in voice |
+| `MOVE_MEMBERS` | `1 << 24` | Move members between voice channels |
+| `USE_VOICE_ACTIVITY_DETECTION` | `1 << 25` | Use voice activity detection |
+
+### Member Management Permissions
+
+| Permission | Value | Description |
+|------------|-------|-------------|
+| `CHANGE_NICKNAME` | `1 << 26` | Change own nickname |
+| `MANAGE_NICKNAMES` | `1 << 27` | Manage other members' nicknames |
+| `MANAGE_ROLES` | `1 << 28` | Manage roles |
+| `MANAGE_WEBHOOKS` | `1 << 29` | Manage webhooks |
+| `MANAGE_EXPRESSIONS` | `1 << 30` | Manage emojis and stickers |
+
+## Usage Examples
+
+### Combining Permissions
+
+Use the bitwise OR operator (`|`) to combine permissions:
+
+```python
+from fluxer.enums import Permissions
+
+# Moderator permissions
+mod_perms = Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS | Permissions.MANAGE_MESSAGES
+
+# Text channel permissions
+text_perms = Permissions.SEND_MESSAGES | Permissions.READ_MESSAGE_HISTORY
+```
+
+### Checking Permissions
+
+Use the bitwise AND operator (`&`) to check if a permission is set:
+
+```python
+from fluxer.enums import Permissions
+
+role_permissions = Permissions.SEND_MESSAGES | Permissions.EMBED_LINKS
+
+# Check if a specific permission is set
+if role_permissions & Permissions.SEND_MESSAGES:
+    print("Can send messages")
+
+# Alternative: using bool()
+if bool(role_permissions & Permissions.ADMINISTRATOR):
+    print("Has administrator")
+```
+
+### Permission Checking in Commands
+
+Use with the `has_permission` check decorator:
+
+```python
+from fluxer import Client
+from fluxer.enums import Permissions
+import fluxer.checks
+
+bot = Client(token="your_token")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+async def kick(ctx, member):
+    """Kick a member (requires KICK_MEMBERS permission)"""
+    await ctx.reply(f"Kicking {member}...")
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS)
+async def punish(ctx, member):
+    """Requires both KICK_MEMBERS and BAN_MEMBERS"""
+    await ctx.reply(f"Punishing {member}...")
+```
+
+### Removing Permissions
+
+Use the bitwise XOR operator (`^`) or NOT operator (`~`) to remove permissions:
+
+```python
+from fluxer.enums import Permissions
+
+# Start with several permissions
+perms = Permissions.SEND_MESSAGES | Permissions.EMBED_LINKS | Permissions.ATTACH_FILES
+
+# Remove EMBED_LINKS
+perms = perms & ~Permissions.EMBED_LINKS
+```
+
+### Administrator Permission
+
+<Warning>
+The `ADMINISTRATOR` permission bypasses all permission checks. Members with this permission have access to all features.
+</Warning>
+
+```python
+from fluxer.enums import Permissions
+
+# Check if user has admin
+if member_permissions & Permissions.ADMINISTRATOR:
+    print("User has administrator - bypasses all checks")
+```
+
+## Best Practices
+
+<Tip>
+- Always check for the minimum required permissions
+- Use the `ADMINISTRATOR` check first to bypass other permission checks
+- Guild owners bypass all permission checks automatically
+</Tip>
+
+<Note>
+Permissions can be set at both the role level and channel level (overwrites). Channel-level permissions override role permissions.
+</Note>

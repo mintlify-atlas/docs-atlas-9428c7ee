@@ -1,0 +1,317 @@
+---
+title: Gateway
+description: WebSocket connection manager for the Fluxer Gateway
+---
+
+## Gateway
+
+Manages the WebSocket connection to the Fluxer Gateway. This class handles the full lifecycle: connect, heartbeat, identify, dispatch events, and reconnect on failure.
+
+### Constructor
+
+```python
+Gateway(
+    *,
+    http_client: Any,
+    token: str,
+    intents: Intents,
+    dispatch: Callable[[str, Any], Coroutine[Any, Any, None]]
+)
+```
+
+<ParamField path="http_client" type="Any" required>
+  HTTPClient instance for making API requests.
+</ParamField>
+
+<ParamField path="token" type="str" required>
+  Bot token for authentication.
+</ParamField>
+
+<ParamField path="intents" type="Intents" required>
+  Gateway intents to request.
+</ParamField>
+
+<ParamField path="dispatch" type="Callable" required>
+  Async callback function for dispatching events. Called with `(event_name: str, data: Any)`.
+</ParamField>
+
+### Properties
+
+#### is_connected
+
+```python
+@property
+def is_connected(self) -> bool
+```
+
+Returns True if the WebSocket is connected and not closed.
+
+## Connection Lifecycle
+
+### connect
+
+```python
+async def connect() -> None
+```
+
+Establish the gateway connection and enter the event loop. This method:
+
+1. Fetches the gateway URL from the API
+2. Establishes the WebSocket connection
+3. Handles HELLO and sends IDENTIFY/RESUME
+4. Starts the heartbeat loop
+5. Enters the event receive loop
+6. Automatically reconnects on connection errors
+
+### close
+
+```python
+async def close() -> None
+```
+
+Gracefully close the gateway connection. Stops heartbeat, closes WebSocket with code 1000, and cleans up the session.
+
+## Gateway Opcodes
+
+The Gateway uses these opcodes for communication:
+
+- `DISPATCH (0)` - Server → Client: An event was dispatched
+- `HEARTBEAT (1)` - Bidirectional: Maintain connection / request heartbeat
+- `IDENTIFY (2)` - Client → Server: Start a new session
+- `PRESENCE_UPDATE (3)` - Client → Server: Update client presence/status
+- `VOICE_STATE_UPDATE (4)` - Client → Server: Join/move/leave voice channels
+- `RESUME (6)` - Client → Server: Resume a dropped connection
+- `RECONNECT (7)` - Server → Client: Client should reconnect
+- `REQUEST_GUILD_MEMBERS (8)` - Client → Server: Request guild member list
+- `INVALID_SESSION (9)` - Server → Client: Session is invalid
+- `HELLO (10)` - Server → Client: Sent on connect, contains heartbeat_interval
+- `HEARTBEAT_ACK (11)` - Server → Client: Acknowledgement of heartbeat
+
+## Presence Management
+
+### update_presence
+
+```python
+async def update_presence(
+    *,
+    status: str = "online",
+    activity_name: str | None = None,
+    activity_type: int = 0
+) -> None
+```
+
+Update the bot's presence/status.
+
+<ParamField path="status" type="str" default="online">
+  Bot status. Values: `"online"`, `"idle"`, `"dnd"`, `"invisible"`.
+</ParamField>
+
+<ParamField path="activity_name" type="str | None" default="None">
+  Activity name to display (e.g., "Playing a game").
+</ParamField>
+
+<ParamField path="activity_type" type="int" default="0">
+  Activity type. Values: 0 (Playing), 1 (Streaming), 2 (Listening), 3 (Watching), 5 (Competing).
+</ParamField>
+
+**Example:**
+
+```python
+await gateway.update_presence(
+    status="online",
+    activity_name="with the Fluxer API",
+    activity_type=0
+)
+```
+
+## Voice State Management
+
+### update_voice_state
+
+```python
+async def update_voice_state(
+    *,
+    guild_id: str,
+    channel_id: str | None = None,
+    self_mute: bool = False,
+    self_deaf: bool = False
+) -> None
+```
+
+Update the bot's voice state. Used to join, move, or leave voice channels.
+
+<ParamField path="guild_id" type="str" required>
+  The guild ID.
+</ParamField>
+
+<ParamField path="channel_id" type="str | None" default="None">
+  The voice channel ID to join. Set to None to leave voice.
+</ParamField>
+
+<ParamField path="self_mute" type="bool" default="False">
+  Whether to join muted.
+</ParamField>
+
+<ParamField path="self_deaf" type="bool" default="False">
+  Whether to join deafened.
+</ParamField>
+
+**Example:**
+
+```python
+# Join a voice channel
+await gateway.update_voice_state(
+    guild_id="123456789",
+    channel_id="987654321",
+    self_mute=False,
+    self_deaf=False
+)
+
+# Leave voice
+await gateway.update_voice_state(
+    guild_id="123456789",
+    channel_id=None
+)
+```
+
+## Gateway Events
+
+The Gateway dispatches these events to your `dispatch` callback:
+
+### Connection Events
+
+- `READY` - Initial state upon successful connection
+- `RESUMED` - Successfully resumed a previous session
+
+### Guild Events
+
+- `GUILD_CREATE` - Guild becomes available or bot joins guild
+- `GUILD_UPDATE` - Guild properties updated
+- `GUILD_DELETE` - Guild becomes unavailable or bot removed
+
+### Channel Events
+
+- `CHANNEL_CREATE` - Channel created
+- `CHANNEL_UPDATE` - Channel updated
+- `CHANNEL_DELETE` - Channel deleted
+
+### Message Events
+
+- `MESSAGE_CREATE` - Message sent
+- `MESSAGE_UPDATE` - Message edited
+- `MESSAGE_DELETE` - Message deleted
+- `MESSAGE_REACTION_ADD` - Reaction added to message
+- `MESSAGE_REACTION_REMOVE` - Reaction removed from message
+- `MESSAGE_REACTION_REMOVE_ALL` - All reactions removed from message
+- `MESSAGE_REACTION_REMOVE_EMOJI` - All reactions of specific emoji removed
+
+### Member Events
+
+- `GUILD_MEMBER_ADD` - User joins guild
+- `GUILD_MEMBER_UPDATE` - Guild member updated
+- `GUILD_MEMBER_REMOVE` - User leaves guild
+
+### Voice Events
+
+- `VOICE_STATE_UPDATE` - User's voice state changes
+- `VOICE_SERVER_UPDATE` - Voice server info sent (for voice connections)
+
+## Gateway Close Codes
+
+The Gateway may close with these codes:
+
+| Code | Name | Reconnectable | Description |
+|------|------|---------------|-------------|
+| 4000 | UNKNOWN_ERROR | Yes | Unknown error occurred |
+| 4001 | UNKNOWN_OPCODE | Yes | Invalid opcode sent |
+| 4002 | DECODE_ERROR | Yes | Invalid payload sent |
+| 4003 | NOT_AUTHENTICATED | Yes | Sent payload before IDENTIFY |
+| 4004 | AUTHENTICATION_FAILED | No | Invalid token |
+| 4005 | ALREADY_AUTHENTICATED | Yes | IDENTIFY sent twice |
+| 4007 | INVALID_SEQ | Yes | Invalid sequence number in RESUME |
+| 4008 | RATE_LIMITED | Yes | Sent too many payloads |
+| 4009 | SESSION_TIMED_OUT | Yes | Session timed out |
+| 4010 | INVALID_SHARD | No | Invalid shard sent |
+| 4011 | SHARDING_REQUIRED | No | Session requires sharding |
+| 4012 | INVALID_API_VERSION | No | Invalid API version |
+| 4013 | INVALID_INTENTS | No | Invalid intents |
+| 4014 | DISALLOWED_INTENTS | No | Disallowed intents requested |
+
+The Gateway automatically reconnects for all reconnectable close codes.
+
+## Heartbeat
+
+The Gateway automatically manages heartbeats:
+
+1. On `HELLO`, the server sends a `heartbeat_interval` (typically 41.25 seconds)
+2. The Gateway starts a heartbeat loop
+3. Every `heartbeat_interval`, sends a `HEARTBEAT` with the current sequence number
+4. Server responds with `HEARTBEAT_ACK`
+5. If `HEARTBEAT_ACK` is not received before the next heartbeat, the connection is closed and reconnected
+
+## Session Resumption
+
+The Gateway supports resuming dropped connections:
+
+1. On `READY`, the server sends `session_id` and `resume_gateway_url`
+2. If the connection drops, the Gateway will:
+   - Reconnect to `resume_gateway_url` if provided
+   - Send `RESUME` with `token`, `session_id`, and last `sequence` number
+   - Server replays missed events since the last sequence
+3. If `INVALID_SESSION` is received with `resumable=false`, the Gateway starts a fresh session with `IDENTIFY`
+
+## GatewayPayload
+
+All gateway messages use this structure:
+
+```python
+class GatewayPayload:
+    op: int              # Opcode
+    d: Any               # Event data (dict, int, or None)
+    s: int | None        # Sequence number (only for op 0 DISPATCH)
+    t: str | None        # Event name (only for op 0 DISPATCH)
+```
+
+### Methods
+
+#### from_json
+
+```python
+@classmethod
+def from_json(cls, raw: str) -> GatewayPayload
+```
+
+Parse a JSON string into a GatewayPayload.
+
+#### to_json
+
+```python
+def to_json(self) -> str
+```
+
+Serialize the payload to JSON.
+
+## Example Usage
+
+```python
+from fluxer import HTTPClient, Gateway, Intents
+
+async def dispatch(event_name: str, data: Any):
+    print(f"Event: {event_name}")
+    print(f"Data: {data}")
+
+http = HTTPClient("your_token")
+gateway = Gateway(
+    http_client=http,
+    token="your_token",
+    intents=Intents.default(),
+    dispatch=dispatch
+)
+
+# Connect and run
+await gateway.connect()
+```
+
+<Note>
+Most users should use the [Client](/api/client) or [Bot](/api/bot) classes instead of using Gateway directly. These higher-level classes handle the Gateway for you and provide a more convenient API.
+</Note>

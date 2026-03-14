@@ -1,0 +1,285 @@
+---
+title: 'Basic Bot Example'
+description: 'Learn how to create a basic fluxer.py bot with commands and event handlers'
+icon: 'robot'
+---
+
+## Overview
+
+This guide walks you through creating a complete basic bot with fluxer.py, including event handlers, commands, and proper bot initialization.
+
+## Complete Basic Bot
+
+Here's a complete example of a basic bot with multiple commands and event handlers:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command()
+async def hello(ctx):
+    await ctx.reply(f"Hello, {ctx.author.display_name}!")
+
+if __name__ == "__main__":
+    TOKEN = "your_bot_token"
+    bot.run(TOKEN)
+```
+
+## Step-by-Step Guide
+
+<Steps>
+  <Step title="Import fluxer.py">
+    Start by importing the fluxer library:
+
+    ```python
+    import fluxer
+    ```
+  </Step>
+
+  <Step title="Create a Bot Instance">
+    Initialize your bot with a command prefix and intents:
+
+    ```python
+    bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+    ```
+
+    <Note>
+      The `command_prefix` determines what symbol triggers commands (e.g., `!ping`).
+      Intents control which events your bot receives from the gateway.
+    </Note>
+  </Step>
+
+  <Step title="Add Event Handlers">
+    Use the `@bot.event` decorator to handle gateway events:
+
+    ```python
+    @bot.event
+    async def on_ready():
+        print(f"Bot is ready! Logged in as {bot.user.username}")
+
+    @bot.event
+    async def on_message(message):
+        if message.author.bot:
+            return
+        print(f"Message from {message.author.username}: {message.content}")
+    ```
+
+    Common events include:
+    - `on_ready` - Bot is connected and ready
+    - `on_message` - New message received
+    - `on_message_edit` - Message was edited
+    - `on_message_delete` - Message was deleted
+    - `on_guild_join` - Bot joined a guild
+    - `on_member_join` - Member joined a guild
+  </Step>
+
+  <Step title="Add Commands">
+    Use the `@bot.command()` decorator to create prefix commands:
+
+    ```python
+    @bot.command()
+    async def ping(ctx):
+        await ctx.reply("Pong!")
+
+    @bot.command(name="greet")
+    async def hello(ctx):
+        await ctx.reply(f"Hello, {ctx.author.display_name}!")
+    ```
+
+    <Note>
+      The `ctx` parameter is the message object that triggered the command.
+      You can access `ctx.author`, `ctx.channel`, `ctx.guild`, and more.
+    </Note>
+  </Step>
+
+  <Step title="Run the Bot">
+    Finally, start your bot with your bot token:
+
+    ```python
+    if __name__ == "__main__":
+        TOKEN = "your_bot_token"
+        bot.run(TOKEN)
+    ```
+  </Step>
+</Steps>
+
+## Commands with Arguments
+
+You can create commands that accept arguments:
+
+<CodeGroup>
+```python Positional Arguments
+@bot.command()
+async def say(ctx, *, message: str):
+    """Repeat a message"""
+    await ctx.send(message)
+
+# Usage: !say Hello, world!
+```
+
+```python Multiple Arguments
+@bot.command()
+async def add(ctx, a: int, b: int):
+    """Add two numbers"""
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+
+# Usage: !add 5 3
+```
+
+```python Default Values
+@bot.command()
+async def greet(ctx, name: str = "friend"):
+    """Greet someone by name"""
+    await ctx.reply(f"Hello, {name}!")
+
+# Usage: !greet Alice
+# Usage: !greet (uses default "friend")
+```
+</CodeGroup>
+
+## Advanced Event Handling
+
+You can also use the `@bot.on()` decorator with explicit event names:
+
+```python
+@bot.on("message")
+async def log_messages(message):
+    """Log all messages to console"""
+    if not message.author.bot:
+        print(f"[{message.channel.id}] {message.author.username}: {message.content}")
+
+@bot.on("guild_join")
+async def on_guild_join(guild):
+    """Welcome message when bot joins a guild"""
+    print(f"Joined guild: {guild.name} (ID: {guild.id})")
+```
+
+## Accessing Bot User Information
+
+The `bot.user` property contains information about your bot:
+
+```python
+@bot.event
+async def on_ready():
+    print(f"ID:            {bot.user.id}")
+    print(f"Username:      {bot.user.username}")
+    print(f"Display Name:  {bot.user.display_name}")
+    print(f"Discriminator: {bot.user.discriminator}")
+    print(f"Bot:           {bot.user.bot}")
+    print(f"Avatar URL:    {bot.user.avatar_url or bot.user.default_avatar_url}")
+```
+
+<Note>
+  Always use `bot.user.display_name` or `str(bot.user)` when showing the bot's name to users.
+  The `display_name` property returns `global_name` if set, otherwise falls back to `username`.
+</Note>
+
+## Error Handling
+
+Add error handling to make your bot more robust:
+
+```python
+@bot.event
+async def on_message(message):
+    try:
+        # Your message handling logic
+        await bot._process_commands(message)
+    except fluxer.HTTPException as e:
+        print(f"HTTP error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+@bot.command()
+async def risky_command(ctx):
+    try:
+        # Command logic that might fail
+        await ctx.reply("Success!")
+    except fluxer.Forbidden:
+        await ctx.reply("I don't have permission to do that!")
+    except fluxer.NotFound:
+        await ctx.reply("Resource not found!")
+```
+
+## Complete Example with Multiple Features
+
+```python
+import fluxer
+import os
+
+# Initialize bot
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.default()
+)
+
+# Event handlers
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.username}")
+    print(f"Bot ID: {bot.user.id}")
+    print("Ready to receive commands!")
+
+@bot.event
+async def on_guild_join(guild):
+    print(f"Joined new guild: {guild.name}")
+
+@bot.event
+async def on_message(message):
+    # Log non-bot messages
+    if not message.author.bot:
+        print(f"[{message.channel.id}] {message.author.username}: {message.content}")
+
+# Commands
+@bot.command()
+async def ping(ctx):
+    """Check bot latency"""
+    await ctx.reply("Pong!")
+
+@bot.command()
+async def info(ctx):
+    """Display bot information"""
+    await ctx.reply(
+        f"**Bot Info**\n"
+        f"Name: {bot.user.display_name}\n"
+        f"ID: {bot.user.id}\n"
+        f"Guilds: {len(bot.guilds)}"
+    )
+
+@bot.command()
+async def echo(ctx, *, message: str):
+    """Echo a message"""
+    await ctx.send(message)
+
+@bot.command()
+async def userinfo(ctx):
+    """Display information about yourself"""
+    user = ctx.author
+    await ctx.reply(
+        f"**User Info**\n"
+        f"Username: {user.username}\n"
+        f"Display Name: {user.display_name}\n"
+        f"ID: {user.id}\n"
+        f"Bot: {user.bot}"
+    )
+
+# Run the bot
+if __name__ == "__main__":
+    TOKEN = os.getenv("FLUXER_BOT_TOKEN") or "your_bot_token_here"
+    bot.run(TOKEN)
+```
+
+## Next Steps
+
+- Learn about [voice bots](/examples/voice-bot) for playing audio
+- Organize your code with [cogs](/examples/cog-example)
+- Explore the [API reference](/api/client) for more features

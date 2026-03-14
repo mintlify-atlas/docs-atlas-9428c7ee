@@ -1,0 +1,543 @@
+---
+title: Events
+description: Understanding the event system in fluxer.py and handling gateway events
+---
+
+## Overview
+
+Events are the core of how your bot responds to actions in Fluxer. When something happens (a message is sent, a user joins, etc.), the gateway dispatches an event that your bot can listen for and respond to.
+
+## Event Registration
+
+fluxer.py provides two ways to register event handlers: the `@event` decorator and the `@on()` decorator.
+
+### Using @event Decorator
+
+The function name determines which event to listen for. All event handlers must start with `on_`.
+
+From `fluxer/client.py:73-99`:
+
+```python
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user}")
+
+@bot.event
+async def on_message(message):
+    print(f"Message from {message.author}: {message.content}")
+
+@bot.event
+async def on_guild_join(guild):
+    print(f"Joined guild: {guild.name}")
+```
+
+<Note>
+Event handler names must start with `on_` or a `ValueError` will be raised.
+</Note>
+
+### Using @on() Decorator
+
+Alternatively, you can specify the event name explicitly:
+
+From `fluxer/client.py:101-117`:
+
+```python
+@bot.on("message")
+async def handle_msg(message):
+    print(f"Got message: {message.content}")
+
+@bot.on("ready")
+async def setup():
+    print("Bot is ready!")
+```
+
+## Available Events
+
+Here are the main events dispatched by the gateway:
+
+### Connection Events
+
+<Accordion title="on_ready">
+
+Fired when the bot successfully connects and is ready to receive events.
+
+**Gateway Event**: `READY`
+
+**Parameters**: None
+
+```python
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.username}")
+    print(f"In {len(bot.guilds)} guilds")
+```
+
+From `fluxer/client.py:133-139`, the READY event populates:
+- `bot.user` - The bot's user object
+- `bot.guilds` - Initial list of guilds
+
+</Accordion>
+
+<Accordion title="on_resumed">
+
+Fired when the bot successfully resumes a connection after a disconnect.
+
+**Gateway Event**: `RESUMED`
+
+**Parameters**: None
+
+```python
+@bot.event
+async def on_resumed():
+    print("Connection resumed successfully")
+```
+
+</Accordion>
+
+### Message Events
+
+<Accordion title="on_message">
+
+Fired when a message is created.
+
+**Gateway Event**: `MESSAGE_CREATE`
+
+**Parameters**:
+- `message` (Message) - The message that was created
+
+```python
+@bot.event
+async def on_message(message):
+    # Ignore messages from bots
+    if message.author.bot:
+        return
+    
+    if "hello" in message.content.lower():
+        await message.reply("Hi there!")
+```
+
+See `fluxer/client.py:141-143` for the implementation.
+
+</Accordion>
+
+<Accordion title="on_message_edit">
+
+Fired when a message is edited.
+
+**Gateway Event**: `MESSAGE_UPDATE`
+
+**Parameters**:
+- `message` (Message) - The edited message
+
+```python
+@bot.event
+async def on_message_edit(message):
+    print(f"Message edited: {message.content}")
+```
+
+</Accordion>
+
+<Accordion title="on_message_delete">
+
+Fired when a message is deleted.
+
+**Gateway Event**: `MESSAGE_DELETE`
+
+**Parameters**:
+- `data` (dict) - Raw data containing channel_id and message_id
+
+```python
+@bot.event
+async def on_message_delete(data):
+    channel_id = data["channel_id"]
+    message_id = data["id"]
+    print(f"Message {message_id} deleted in channel {channel_id}")
+```
+
+<Warning>
+Unlike other events, this receives raw data instead of a Message object, since the message may not be cached.
+</Warning>
+
+</Accordion>
+
+### Guild Events
+
+<Accordion title="on_guild_join">
+
+Fired when the bot joins a guild or when a guild becomes available.
+
+**Gateway Event**: `GUILD_CREATE`
+
+**Parameters**:
+- `guild` (Guild) - The guild that was joined
+
+```python
+@bot.event
+async def on_guild_join(guild):
+    print(f"Joined guild: {guild.name} (ID: {guild.id})")
+    print(f"Member count: {guild.member_count}")
+```
+
+From `fluxer/client.py:152-160`, this event also caches all channels in the guild.
+
+</Accordion>
+
+<Accordion title="on_guild_remove">
+
+Fired when the bot is removed from a guild or when a guild becomes unavailable.
+
+**Gateway Event**: `GUILD_DELETE`
+
+**Parameters**:
+- `guild` (Guild | dict) - The guild object if cached, otherwise raw data
+
+```python
+@bot.event
+async def on_guild_remove(guild):
+    if isinstance(guild, dict):
+        print(f"Left guild ID: {guild['id']}")
+    else:
+        print(f"Left guild: {guild.name}")
+```
+
+</Accordion>
+
+### Member Events
+
+<Accordion title="on_member_join">
+
+Fired when a user joins a guild.
+
+**Gateway Event**: `GUILD_MEMBER_ADD`
+
+**Parameters**:
+- `data` (dict) - Raw member data
+
+```python
+@bot.event
+async def on_member_join(data):
+    guild_id = data["guild_id"]
+    user = data["user"]
+    print(f"User {user['username']} joined guild {guild_id}")
+```
+
+<Note>
+Requires the `GUILD_MEMBERS` intent (privileged).
+</Note>
+
+</Accordion>
+
+<Accordion title="on_member_remove">
+
+Fired when a user leaves or is removed from a guild.
+
+**Gateway Event**: `GUILD_MEMBER_REMOVE`
+
+**Parameters**:
+- `data` (dict) - Raw member data
+
+```python
+@bot.event
+async def on_member_remove(data):
+    guild_id = data["guild_id"]
+    user = data["user"]
+    print(f"User {user['username']} left guild {guild_id}")
+```
+
+</Accordion>
+
+### Channel Events
+
+<Accordion title="on_channel_create">
+
+Fired when a channel is created.
+
+**Gateway Event**: `CHANNEL_CREATE`
+
+**Parameters**:
+- `channel` (Channel) - The channel that was created
+
+```python
+@bot.event
+async def on_channel_create(channel):
+    print(f"Channel created: {channel.name}")
+```
+
+</Accordion>
+
+<Accordion title="on_channel_update">
+
+Fired when a channel is updated (name, topic, permissions, etc.).
+
+**Gateway Event**: `CHANNEL_UPDATE`
+
+**Parameters**:
+- `channel` (Channel) - The updated channel
+
+```python
+@bot.event
+async def on_channel_update(channel):
+    print(f"Channel updated: {channel.name}")
+```
+
+</Accordion>
+
+<Accordion title="on_channel_delete">
+
+Fired when a channel is deleted.
+
+**Gateway Event**: `CHANNEL_DELETE`
+
+**Parameters**:
+- `channel` (Channel | dict) - The channel object if cached, otherwise raw data
+
+```python
+@bot.event
+async def on_channel_delete(channel):
+    if isinstance(channel, dict):
+        print(f"Channel deleted (ID: {channel['id']})")
+    else:
+        print(f"Channel deleted: {channel.name}")
+```
+
+See `fluxer/client.py:187-198` for the implementation.
+
+</Accordion>
+
+### Voice Events
+
+<Accordion title="on_voice_state_update">
+
+Fired when a user joins, leaves, or moves voice channels.
+
+**Gateway Event**: `VOICE_STATE_UPDATE`
+
+**Parameters**:
+- `voice_state` (VoiceState) - The updated voice state
+
+```python
+@bot.event
+async def on_voice_state_update(voice_state):
+    if voice_state.channel_id is None:
+        print(f"User {voice_state.user_id} left voice")
+    else:
+        print(f"User {voice_state.user_id} joined channel {voice_state.channel_id}")
+```
+
+From `fluxer/client.py:200-211`, voice states are automatically cached.
+
+<Note>
+Requires the `GUILD_VOICE_STATES` intent.
+</Note>
+
+</Accordion>
+
+### Reaction Events
+
+<Accordion title="on_raw_reaction_add">
+
+Fired when a reaction is added to a message.
+
+**Gateway Event**: `MESSAGE_REACTION_ADD`
+
+**Parameters**:
+- `raw` (RawReactionActionEvent) - Raw reaction data
+
+```python
+@bot.event
+async def on_raw_reaction_add(raw):
+    print(f"Reaction {raw.emoji} added to message {raw.message_id}")
+    print(f"By user {raw.user_id} in channel {raw.channel_id}")
+```
+
+See `fluxer/client.py:263-276` for the implementation.
+
+</Accordion>
+
+<Accordion title="on_raw_reaction_remove">
+
+Fired when a reaction is removed from a message.
+
+**Gateway Event**: `MESSAGE_REACTION_REMOVE`
+
+**Parameters**:
+- `raw` (RawReactionActionEvent) - Raw reaction data
+
+```python
+@bot.event
+async def on_raw_reaction_remove(raw):
+    print(f"Reaction {raw.emoji} removed from message {raw.message_id}")
+```
+
+</Accordion>
+
+<Accordion title="on_raw_reaction_clear">
+
+Fired when all reactions are removed from a message.
+
+**Gateway Event**: `MESSAGE_REACTION_REMOVE_ALL`
+
+**Parameters**:
+- `raw` (RawReactionClearEvent) - Raw reaction clear data
+
+```python
+@bot.event
+async def on_raw_reaction_clear(raw):
+    print(f"All reactions cleared from message {raw.message_id}")
+```
+
+</Accordion>
+
+<Accordion title="on_raw_reaction_clear_emoji">
+
+Fired when all reactions of a specific emoji are removed.
+
+**Gateway Event**: `MESSAGE_REACTION_REMOVE_EMOJI`
+
+**Parameters**:
+- `raw` (RawReactionClearEmojiEvent) - Raw data
+
+```python
+@bot.event
+async def on_raw_reaction_clear_emoji(raw):
+    print(f"All {raw.emoji} reactions cleared from message {raw.message_id}")
+```
+
+</Accordion>
+
+## How Events Work Internally
+
+From `fluxer/client.py:123-130`, here's how the event system processes gateway events:
+
+1. Gateway receives a dispatch event (op code 0)
+2. `_dispatch()` method parses the raw data into model objects
+3. Internal caches are updated (guilds, channels, etc.)
+4. All registered handlers for that event are fired
+
+```python
+async def _dispatch(self, event_name: str, data: Any) -> None:
+    """Called by the Gateway when a dispatch event is received.
+
+    This method:
+    1. Parses the raw data into model objects
+    2. Updates internal caches
+    3. Fires matching user event handlers
+    """
+```
+
+## Error Handling in Events
+
+From `fluxer/client.py:311-318`, exceptions in event handlers are automatically caught and logged:
+
+```python
+async def _fire(self, event_name: str, *args: Any) -> None:
+    """Fire all registered handlers for an event."""
+    handlers = self._event_handlers.get(event_name, [])
+    for handler in handlers:
+        try:
+            await handler(*args)
+        except Exception:
+            log.exception("Error in event handler '%s'", event_name)
+```
+
+<Warning>
+Errors in event handlers won't crash your bot, but they will be logged. Always handle exceptions appropriately in your event handlers.
+</Warning>
+
+### Best Practice
+
+```python
+@bot.event
+async def on_message(message):
+    try:
+        # Your message handling logic
+        if message.content.startswith("!risky"):
+            await risky_operation(message)
+    except Exception as e:
+        # Handle the error gracefully
+        await message.reply(f"An error occurred: {e}")
+        # Optionally log for debugging
+        import logging
+        logging.exception("Error in on_message handler")
+```
+
+## Multiple Event Handlers
+
+You can register multiple handlers for the same event:
+
+```python
+@bot.event
+async def on_message(message):
+    print("Handler 1")
+
+@bot.event
+async def on_message(message):
+    print("Handler 2")
+
+# Both handlers will be called in registration order
+```
+
+## Generic Event Handler
+
+From `fluxer/client.py:243-246`, any unknown gateway event is automatically converted to a handler name:
+
+```python
+case _:
+    # Unknown/unhandled event — fire a generic handler
+    handler_name = f"on_{event_name.lower()}"
+    await self._fire(handler_name, data)
+```
+
+This means you can listen for any gateway event, even if it's not explicitly documented:
+
+```python
+@bot.on("presence_update")
+async def handle_presence(data):
+    print(f"Presence update: {data}")
+```
+
+## Event Name Mapping
+
+Gateway events are mapped to handler names:
+
+| Gateway Event | Handler Name | Parameters |
+|--------------|--------------|------------|
+| READY | on_ready | None |
+| MESSAGE_CREATE | on_message | Message |
+| MESSAGE_UPDATE | on_message_edit | Message |
+| MESSAGE_DELETE | on_message_delete | dict |
+| GUILD_CREATE | on_guild_join | Guild |
+| GUILD_DELETE | on_guild_remove | Guild or dict |
+| GUILD_MEMBER_ADD | on_member_join | dict |
+| GUILD_MEMBER_REMOVE | on_member_remove | dict |
+| CHANNEL_CREATE | on_channel_create | Channel |
+| CHANNEL_UPDATE | on_channel_update | Channel |
+| CHANNEL_DELETE | on_channel_delete | Channel or dict |
+| VOICE_STATE_UPDATE | on_voice_state_update | VoiceState |
+| MESSAGE_REACTION_ADD | on_raw_reaction_add | RawReactionActionEvent |
+| MESSAGE_REACTION_REMOVE | on_raw_reaction_remove | RawReactionActionEvent |
+| MESSAGE_REACTION_REMOVE_ALL | on_raw_reaction_clear | RawReactionClearEvent |
+| MESSAGE_REACTION_REMOVE_EMOJI | on_raw_reaction_clear_emoji | RawReactionClearEmojiEvent |
+| RESUMED | on_resumed | None |
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Intents" icon="filter" href="/concepts/intents">
+  Configure which events your bot receives
+</Card>
+
+<Card title="Client vs Bot" icon="robot" href="/concepts/client-vs-bot">
+  Choose the right class for your use case
+</Card>
+
+<Card title="Error Handling" icon="triangle-exclamation" href="/concepts/error-handling">
+  Handle errors and exceptions in your bot
+</Card>
+
+<Card title="Commands" icon="terminal" href="/guides/commands">
+  Build prefix commands with the Bot class
+</Card>
+
+</CardGroup>

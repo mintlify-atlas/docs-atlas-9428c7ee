@@ -1,0 +1,156 @@
+---
+title: ChannelType
+description: Enum representing different types of channels in Fluxer
+---
+
+## Overview
+
+The `ChannelType` enum defines all the different types of channels that can exist in Fluxer. Each channel type has specific properties and behaviors.
+
+## ChannelType Enum
+
+```python
+from fluxer.enums import ChannelType
+```
+
+The `ChannelType` class is an `IntEnum` that represents the various channel types.
+
+## Channel Types
+
+| Type | Value | Description |
+|------|-------|-------------|
+| `GUILD_TEXT` | `0` | Text channel in a guild |
+| `DM` | `1` | Direct message channel |
+| `GUILD_VOICE` | `2` | Voice channel in a guild |
+| `GROUP_DM` | `3` | Group direct message channel |
+| `GUILD_CATEGORY` | `4` | Category that contains channels |
+| `GUILD_ANNOUNCEMENT` | `5` | Announcement (news) channel |
+
+## Usage Examples
+
+### Checking Channel Type
+
+Check the type of a channel:
+
+```python
+from fluxer.enums import ChannelType
+
+@bot.event
+async def on_message(message):
+    channel = message.channel
+    
+    if channel.type == ChannelType.GUILD_TEXT:
+        print("Message sent in a guild text channel")
+    elif channel.type == ChannelType.DM:
+        print("Message sent in a DM")
+    elif channel.type == ChannelType.GUILD_VOICE:
+        print("Message sent in a voice channel")
+```
+
+### Filtering Channels by Type
+
+Filter channels when iterating:
+
+```python
+from fluxer.enums import ChannelType
+
+@bot.command()
+async def list_text_channels(ctx):
+    """List all text channels in the guild"""
+    guild = await bot.get_guild(ctx.guild_id)
+    channels = await guild.get_channels()
+    
+    text_channels = [
+        channel for channel in channels
+        if channel.type == ChannelType.GUILD_TEXT
+    ]
+    
+    channel_names = [ch.name for ch in text_channels]
+    await ctx.reply(f"Text channels: {', '.join(channel_names)}")
+```
+
+### Type-Specific Logic
+
+Implement different behavior based on channel type:
+
+```python
+from fluxer.enums import ChannelType
+
+@bot.command()
+async def info(ctx):
+    """Show channel information"""
+    channel = ctx.channel
+    
+    if channel.type == ChannelType.GUILD_TEXT:
+        await ctx.reply(f"This is a text channel named {channel.name}")
+    elif channel.type == ChannelType.GUILD_VOICE:
+        await ctx.reply(f"This is a voice channel named {channel.name}")
+    elif channel.type == ChannelType.GUILD_CATEGORY:
+        await ctx.reply(f"This is a category named {channel.name}")
+    elif channel.type == ChannelType.DM:
+        await ctx.reply("This is a DM channel")
+    elif channel.type == ChannelType.GROUP_DM:
+        await ctx.reply("This is a group DM channel")
+    elif channel.type == ChannelType.GUILD_ANNOUNCEMENT:
+        await ctx.reply(f"This is an announcement channel named {channel.name}")
+```
+
+### Creating Channels with Specific Types
+
+Specify the channel type when creating channels:
+
+```python
+from fluxer.enums import ChannelType
+
+@bot.command()
+async def create_channel(ctx, name: str, channel_type: str):
+    """Create a new channel"""
+    if channel_type == "text":
+        type_value = ChannelType.GUILD_TEXT
+    elif channel_type == "voice":
+        type_value = ChannelType.GUILD_VOICE
+    elif channel_type == "category":
+        type_value = ChannelType.GUILD_CATEGORY
+    else:
+        await ctx.reply("Invalid channel type")
+        return
+    
+    # Create the channel
+    channel = await ctx.guild.create_channel(
+        name=name,
+        type=type_value
+    )
+    await ctx.reply(f"Created channel: {channel.name}")
+```
+
+## Channel Type Properties
+
+### Guild Channels
+
+These channel types exist within guilds:
+- `GUILD_TEXT` - Text-based communication
+- `GUILD_VOICE` - Voice communication
+- `GUILD_CATEGORY` - Organizational container
+- `GUILD_ANNOUNCEMENT` - Announcement/news channel
+
+### Direct Message Channels
+
+These channel types are for direct messaging:
+- `DM` - One-on-one conversation
+- `GROUP_DM` - Group conversation
+
+<Note>
+Direct message channels don't have guild-specific properties like permissions or categories.
+</Note>
+
+## Best Practices
+
+<Tip>
+- Always check the channel type before performing type-specific operations
+- Use type checks to prevent errors when accessing channel-specific properties
+- Remember that DM channels don't have guild-related attributes
+</Tip>
+
+<Warning>
+Attempting to access guild-specific properties (like `guild_id`) on DM channels will result in `None` or errors.
+</Warning>

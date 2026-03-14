@@ -1,0 +1,338 @@
+---
+title: Guild
+description: Represents a Fluxer guild (server/community)
+---
+
+## Overview
+
+The `Guild` class represents a Fluxer guild (server/community). It provides methods for managing guild resources such as members, roles, emojis, and moderation actions.
+
+## Class Definition
+
+```python
+from fluxer.models import Guild
+
+@dataclass(slots=True)
+class Guild:
+    """Represents a Fluxer guild (server/community)."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the guild
+</ResponseField>
+
+<ResponseField name="name" type="str | None">
+  The name of the guild
+</ResponseField>
+
+<ResponseField name="icon" type="str | None">
+  The icon hash for the guild
+</ResponseField>
+
+<ResponseField name="owner_id" type="int | None">
+  The user ID of the guild owner
+</ResponseField>
+
+<ResponseField name="member_count" type="int | None">
+  The total number of members in the guild
+</ResponseField>
+
+<ResponseField name="unavailable" type="bool" default="False">
+  Whether the guild is unavailable due to an outage
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="created_at" type="datetime">
+  When the guild was created (derived from snowflake ID)
+  
+  ```python
+  guild = await client.fetch_guild(123456789)
+  print(guild.created_at)  # datetime object
+  ```
+</ResponseField>
+
+<ResponseField name="icon_url" type="str | None">
+  URL for the guild's icon, or None if no icon is set. Automatically detects animated icons.
+  
+  ```python
+  if guild.icon_url:
+      print(f"Icon: {guild.icon_url}")
+  ```
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> Guild
+```
+
+Construct a Guild instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw guild object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+### fetch_emojis
+
+```python
+async def fetch_emojis() -> list[Emoji]
+```
+
+Fetch all custom emojis in this guild.
+
+**Returns:** List of `Emoji` objects
+
+**Example:**
+```python
+emojis = await guild.fetch_emojis()
+for emoji in emojis:
+    print(f"{emoji.name}: {emoji}")
+```
+
+### fetch_roles
+
+```python
+async def fetch_roles() -> list[Role]
+```
+
+Fetch all roles in this guild.
+
+**Returns:** List of `Role` objects
+
+**Example:**
+```python
+roles = await guild.fetch_roles()
+for role in roles:
+    print(f"{role.name}: {role.mention}")
+```
+
+### create_role
+
+```python
+async def create_role(
+    *,
+    name: str | None = None,
+    permissions: int | None = None,
+    color: int = 0,
+    hoist: bool = False,
+    mentionable: bool = False,
+) -> Role
+```
+
+Create a new role in this guild.
+
+<ParamField path="name" type="str | None">
+  Role name
+</ParamField>
+
+<ParamField path="permissions" type="int | None">
+  Permission bitfield
+</ParamField>
+
+<ParamField path="color" type="int" default="0">
+  Role color (RGB integer)
+</ParamField>
+
+<ParamField path="hoist" type="bool" default="False">
+  Whether to display role separately in member list
+</ParamField>
+
+<ParamField path="mentionable" type="bool" default="False">
+  Whether role can be mentioned
+</ParamField>
+
+**Returns:** The created `Role` object
+
+**Example:**
+```python
+role = await guild.create_role(
+    name="Moderator",
+    color=0x5865F2,
+    hoist=True,
+    mentionable=True
+)
+```
+
+### fetch_member
+
+```python
+async def fetch_member(user_id: int) -> GuildMember
+```
+
+Fetch a specific member from this guild.
+
+<ParamField path="user_id" type="int" required>
+  User ID to fetch
+</ParamField>
+
+**Returns:** `GuildMember` object
+
+**Example:**
+```python
+member = await guild.fetch_member(123456789)
+print(f"Member: {member.display_name}")
+```
+
+### fetch_members
+
+```python
+async def fetch_members(
+    *,
+    limit: int = 100,
+    after: int | None = None
+) -> list[GuildMember]
+```
+
+Fetch members from this guild.
+
+<ParamField path="limit" type="int" default="100">
+  Maximum number of members to fetch (1-1000)
+</ParamField>
+
+<ParamField path="after" type="int | None">
+  Fetch members after this user ID (for pagination)
+</ParamField>
+
+**Returns:** List of `GuildMember` objects
+
+**Example:**
+```python
+members = await guild.fetch_members(limit=50)
+for member in members:
+    print(member.display_name)
+```
+
+### kick
+
+```python
+async def kick(user_id: int, *, reason: str | None = None) -> None
+```
+
+Kick a member from this guild.
+
+<ParamField path="user_id" type="int" required>
+  User ID to kick
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await guild.kick(123456789, reason="Violating rules")
+```
+
+### ban
+
+```python
+async def ban(
+    user_id: int,
+    *,
+    delete_message_days: int = 0,
+    delete_message_seconds: int = 0,
+    reason: str | None = None,
+) -> None
+```
+
+Ban a user from this guild.
+
+<ParamField path="user_id" type="int" required>
+  User ID to ban
+</ParamField>
+
+<ParamField path="delete_message_days" type="int" default="0">
+  Number of days to delete messages for (0-7)
+</ParamField>
+
+<ParamField path="delete_message_seconds" type="int" default="0">
+  Number of seconds to delete messages for (0-604800)
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await guild.ban(
+    123456789,
+    delete_message_days=7,
+    reason="Spam"
+)
+```
+
+### unban
+
+```python
+async def unban(user_id: int, *, reason: str | None = None) -> None
+```
+
+Unban a user from this guild.
+
+<ParamField path="user_id" type="int" required>
+  User ID to unban
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await guild.unban(123456789, reason="Appeal accepted")
+```
+
+## Usage Example
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user}")
+    
+    # Fetch a guild
+    guild = await client.fetch_guild(123456789)
+    print(f"Guild: {guild.name}")
+    print(f"Created: {guild.created_at}")
+    print(f"Members: {guild.member_count}")
+    
+    # Fetch and display roles
+    roles = await guild.fetch_roles()
+    for role in roles:
+        print(f"Role: {role.name} (Position: {role.position})")
+    
+    # Create a new role
+    mod_role = await guild.create_role(
+        name="Moderator",
+        color=0x5865F2,
+        hoist=True
+    )
+    
+    # Fetch members
+    members = await guild.fetch_members(limit=10)
+    for member in members:
+        print(f"Member: {member.display_name}")
+
+client.run()
+```
+
+## Related Models
+
+- [GuildMember](/api/models/member) - Represents a member in a guild
+- [Role](/api/models/role) - Represents a guild role
+- [Emoji](/api/models/emoji) - Represents a custom emoji
+- [Channel](/api/models/channel) - Represents a guild channel

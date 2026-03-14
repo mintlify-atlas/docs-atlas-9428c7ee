@@ -1,0 +1,291 @@
+---
+title: Cog
+description: Base class for organizing bot commands and event listeners into modular components
+---
+
+## Cog
+
+Base class for creating cogs. A cog is a collection of commands and event listeners grouped together. This is useful for organizing large bots into logical modules.
+
+Similar to discord.py's cog system, this allows you to group related commands and event handlers into separate classes for better code organization.
+
+### Constructor
+
+```python
+Cog(bot: Bot)
+```
+
+<ParamField path="bot" type="Bot" required>
+  The bot instance this cog is attached to.
+</ParamField>
+
+**Example:**
+
+```python
+from fluxer import Cog, Bot
+
+class MyCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+
+    @Cog.command()
+    async def hello(self, ctx):
+        await ctx.reply("Hello from MyCog!")
+
+bot = Bot()
+await bot.add_cog(MyCog(bot))
+```
+
+## Decorators
+
+### command
+
+```python
+@staticmethod
+def command(name: str | None = None) -> Callable[[EventHandler], EventHandler]
+```
+
+Decorator to mark a method as a command.
+
+<ParamField path="name" type="str | None" default="None">
+  Optional command name. If not provided, uses the method name.
+</ParamField>
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    @Cog.command()
+    async def ping(self, ctx):
+        await ctx.reply("Pong!")
+
+    @Cog.command(name="hi")
+    async def hello(self, ctx):
+        await ctx.reply("Hello!")
+```
+
+### listener
+
+```python
+@staticmethod
+def listener(name: str | None = None) -> Callable[[EventHandler], EventHandler]
+```
+
+Decorator to mark a method as an event listener.
+
+<ParamField path="name" type="str | None" default="None">
+  Optional event name. If not provided, uses the method name.
+</ParamField>
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    @Cog.listener()
+    async def on_message(self, message):
+        print(f"Message received: {message.content}")
+
+    @Cog.listener(name="on_ready")
+    async def bot_ready(self):
+        print("Bot is ready!")
+```
+
+## Lifecycle Hooks
+
+### cog_load
+
+```python
+async def cog_load() -> None
+```
+
+Called when the cog is loaded. Override this to run setup code when the cog is added to the bot.
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    async def cog_load(self):
+        print(f"{self.__class__.__name__} loaded!")
+        # Initialize resources, load data, etc.
+```
+
+### cog_unload
+
+```python
+async def cog_unload() -> None
+```
+
+Called when the cog is unloaded. Override this to run cleanup code when the cog is removed from the bot.
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    async def cog_unload(self):
+        print(f"{self.__class__.__name__} unloaded!")
+        # Clean up resources, save data, etc.
+```
+
+## Complete Example
+
+### Basic Cog
+
+```python
+from fluxer import Cog, Bot
+
+class ModerationCog(Cog):
+    """Moderation commands for the bot."""
+
+    def __init__(self, bot):
+        super().__init__(bot)
+        self.warns = {}  # Store warnings
+
+    async def cog_load(self):
+        print("ModerationCog loaded!")
+
+    async def cog_unload(self):
+        print("ModerationCog unloaded!")
+
+    @Cog.command()
+    async def warn(self, ctx, user: str, *, reason: str):
+        """Warn a user."""
+        if user not in self.warns:
+            self.warns[user] = []
+        self.warns[user].append(reason)
+        await ctx.reply(f"Warned {user}: {reason}")
+
+    @Cog.command()
+    async def warnings(self, ctx, user: str):
+        """Check a user's warnings."""
+        warns = self.warns.get(user, [])
+        if not warns:
+            await ctx.reply(f"{user} has no warnings.")
+        else:
+            await ctx.reply(f"{user} has {len(warns)} warning(s): {', '.join(warns)}")
+
+    @Cog.listener()
+    async def on_message(self, message):
+        """Log all messages."""
+        print(f"[{message.author.username}] {message.content}")
+
+# Using the cog
+bot = Bot(command_prefix="!")
+await bot.add_cog(ModerationCog(bot))
+bot.run("your_token")
+```
+
+### Extension-based Cog
+
+You can also use cogs with the extension system:
+
+```python
+# cogs/fun.py
+from fluxer import Cog
+import random
+
+class FunCog(Cog):
+    """Fun commands for the bot."""
+
+    @Cog.command()
+    async def roll(self, ctx, sides: int = 6):
+        """Roll a dice."""
+        result = random.randint(1, sides)
+        await ctx.reply(f"You rolled a {result}!")
+
+    @Cog.command()
+    async def flip(self, ctx):
+        """Flip a coin."""
+        result = random.choice(["Heads", "Tails"])
+        await ctx.reply(f"The coin landed on {result}!")
+
+    @Cog.listener()
+    async def on_ready(self):
+        print("FunCog is ready!")
+
+async def setup(bot):
+    await bot.add_cog(FunCog(bot))
+
+# In your main bot file:
+await bot.load_extension("cogs.fun")
+```
+
+## Multiple Cogs
+
+You can load multiple cogs to organize your bot:
+
+```python
+from fluxer import Bot
+
+bot = Bot(command_prefix="!")
+
+# Load multiple cogs
+await bot.load_extension("cogs.moderation")
+await bot.load_extension("cogs.fun")
+await bot.load_extension("cogs.music")
+await bot.load_extension("cogs.admin")
+
+bot.run("your_token")
+```
+
+## Hot Reloading
+
+During development, you can reload cogs without restarting the bot:
+
+```python
+# Reload a single cog
+await bot.reload_extension("cogs.fun")
+
+# Or create a reload command
+@bot.command()
+async def reload(ctx, extension: str):
+    """Reload an extension."""
+    try:
+        await bot.reload_extension(f"cogs.{extension}")
+        await ctx.reply(f"Reloaded {extension}!")
+    except Exception as e:
+        await ctx.reply(f"Failed to reload {extension}: {e}")
+```
+
+## Accessing the Bot
+
+All cogs have access to the bot instance via `self.bot`:
+
+```python
+class MyCog(Cog):
+    @Cog.command()
+    async def stats(self, ctx):
+        """Show bot statistics."""
+        guild_count = len(self.bot.guilds)
+        user = self.bot.user
+        await ctx.reply(f"I'm {user.username} and I'm in {guild_count} guilds!")
+```
+
+## Command Arguments
+
+Cog commands support the same argument parsing as regular bot commands:
+
+```python
+class MyCog(Cog):
+    @Cog.command()
+    async def add(self, ctx, a: int, b: int):
+        """Add two numbers."""
+        await ctx.reply(f"{a} + {b} = {a + b}")
+
+    @Cog.command()
+    async def say(self, ctx, *, message: str):
+        """Say something."""
+        await ctx.reply(message)
+
+    @Cog.command()
+    async def greet(self, ctx, name: str = "World"):
+        """Greet someone."""
+        await ctx.reply(f"Hello, {name}!")
+```
+
+## Best Practices
+
+1. **Group related commands** - Put similar commands in the same cog (e.g., all moderation commands in `ModerationCog`)
+2. **Use lifecycle hooks** - Initialize resources in `cog_load()` and clean up in `cog_unload()`
+3. **Keep cogs independent** - Avoid tight coupling between cogs
+4. **Use extensions** - Put each cog in its own file and load with `load_extension()`
+5. **Document your cogs** - Add docstrings to cog classes and commands

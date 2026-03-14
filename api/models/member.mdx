@@ -1,0 +1,404 @@
+---
+title: GuildMember
+description: Represents a member of a guild
+---
+
+## Overview
+
+The `GuildMember` class represents a user within a specific guild context. It combines a `User` object with guild-specific information like nickname, roles, join date, and voice state.
+
+## Class Definition
+
+```python
+from fluxer.models import GuildMember
+
+@dataclass(slots=True)
+class GuildMember:
+    """Represents a member of a guild."""
+```
+
+## Properties
+
+<ResponseField name="user" type="User" required>
+  The underlying User object
+</ResponseField>
+
+<ResponseField name="nick" type="str | None">
+  Guild nickname (overrides global_name)
+</ResponseField>
+
+<ResponseField name="avatar_hash" type="str | None">
+  Guild-specific avatar hash
+</ResponseField>
+
+<ResponseField name="banner" type="str | None">
+  Guild-specific banner
+</ResponseField>
+
+<ResponseField name="accent_color" type="int | None">
+  Guild-specific accent color
+</ResponseField>
+
+<ResponseField name="roles" type="list[int]" default="[]">
+  List of role IDs (as integers)
+</ResponseField>
+
+<ResponseField name="joined_at" type="str | None">
+  ISO 8601 timestamp of when the member joined
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this member belongs to
+</ResponseField>
+
+<ResponseField name="join_source_type" type="int | None">
+  How the member joined (invite, discovery, etc.)
+</ResponseField>
+
+<ResponseField name="source_invite_code" type="str | None">
+  The invite code used to join
+</ResponseField>
+
+<ResponseField name="inviter_id" type="int | None">
+  The user ID who invited this member
+</ResponseField>
+
+<ResponseField name="mute" type="bool" default="False">
+  Whether the member is server muted in voice
+</ResponseField>
+
+<ResponseField name="deaf" type="bool" default="False">
+  Whether the member is server deafened in voice
+</ResponseField>
+
+<ResponseField name="communication_disabled_until" type="str | None">
+  ISO 8601 timestamp when timeout expires (None if not timed out)
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="display_name" type="str">
+  The best display name for this member. Priority: guild nickname > global name > username
+  
+  ```python
+  print(f"Welcome, {member.display_name}!")
+  ```
+</ResponseField>
+
+<ResponseField name="mention" type="str">
+  A string that mentions this member in a message
+  
+  ```python
+  await channel.send(f"Hello {member.mention}!")  # <@123456789>
+  ```
+</ResponseField>
+
+<ResponseField name="guild_avatar_url" type="str | None">
+  URL for the member's guild-specific avatar, if set. Automatically detects animated avatars.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    *,
+    guild_id: int | None = None,
+) -> GuildMember
+```
+
+Construct a GuildMember instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw member object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+<ParamField path="guild_id" type="int | None">
+  Guild ID (may not be in data for some endpoints)
+</ParamField>
+
+### add_role
+
+```python
+async def add_role(role_id: int, *, reason: str | None = None) -> None
+```
+
+Add a role to this member.
+
+<ParamField path="role_id" type="int" required>
+  Role ID to add
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+# Add a role
+await member.add_role(123456789, reason="Promotion")
+```
+
+### remove_role
+
+```python
+async def remove_role(role_id: int, *, reason: str | None = None) -> None
+```
+
+Remove a role from this member.
+
+<ParamField path="role_id" type="int" required>
+  Role ID to remove
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await member.remove_role(123456789, reason="Demotion")
+```
+
+### has_role
+
+```python
+def has_role(role_id: int) -> bool
+```
+
+Check if this member has a specific role.
+
+<ParamField path="role_id" type="int" required>
+  Role ID to check
+</ParamField>
+
+**Returns:** True if member has the role, False otherwise
+
+**Example:**
+```python
+if member.has_role(mod_role_id):
+    print("This user is a moderator")
+```
+
+### kick
+
+```python
+async def kick(*, reason: str | None = None) -> None
+```
+
+Kick (remove) this member from the guild.
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await member.kick(reason="Violating rules")
+```
+
+### ban
+
+```python
+async def ban(
+    *,
+    delete_message_days: int = 0,
+    delete_message_seconds: int = 0,
+    reason: str | None = None,
+) -> None
+```
+
+Ban this member from the guild.
+
+<ParamField path="delete_message_days" type="int" default="0">
+  Number of days to delete messages for (0-7)
+</ParamField>
+
+<ParamField path="delete_message_seconds" type="int" default="0">
+  Number of seconds to delete messages for (0-604800)
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Example:**
+```python
+await member.ban(
+    delete_message_days=7,
+    reason="Spam"
+)
+```
+
+### timeout
+
+```python
+async def timeout(
+    *,
+    until: str | None = None,
+    reason: str | None = None
+) -> GuildMember
+```
+
+Timeout this member (or remove timeout).
+
+<ParamField path="until" type="str | None">
+  ISO 8601 timestamp for when timeout expires (None to remove timeout)
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Returns:** Updated `GuildMember` object
+
+**Example:**
+```python
+from datetime import datetime, timedelta
+
+# Timeout for 1 hour
+until = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+await member.timeout(until=until, reason="Spamming")
+
+# Remove timeout
+await member.timeout(until=None, reason="Appeal accepted")
+```
+
+### edit
+
+```python
+async def edit(
+    *,
+    nick: str | None = None,
+    roles: list[int | str] | None = None,
+    mute: bool | None = None,
+    deaf: bool | None = None,
+    channel_id: int | None = None,
+    communication_disabled_until: str | None = None,
+    reason: str | None = None,
+) -> GuildMember
+```
+
+Edit this member.
+
+<ParamField path="nick" type="str | None">
+  New nickname (None to remove)
+</ParamField>
+
+<ParamField path="roles" type="list[int | str] | None">
+  List of role IDs to set (replaces all roles)
+</ParamField>
+
+<ParamField path="mute" type="bool | None">
+  Whether to mute in voice channels
+</ParamField>
+
+<ParamField path="deaf" type="bool | None">
+  Whether to deafen in voice channels
+</ParamField>
+
+<ParamField path="channel_id" type="int | None">
+  Voice channel to move member to
+</ParamField>
+
+<ParamField path="communication_disabled_until" type="str | None">
+  Timeout timestamp (ISO 8601)
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log
+</ParamField>
+
+**Returns:** Updated `GuildMember` object
+
+**Example:**
+```python
+# Change nickname
+await member.edit(nick="NewNickname", reason="User request")
+
+# Set roles
+await member.edit(roles=[role1_id, role2_id])
+
+# Mute in voice
+await member.edit(mute=True, reason="Temporary mute")
+```
+
+## Usage Example
+
+```python
+import fluxer
+from fluxer import Embed
+from datetime import datetime, timedelta
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if not message.guild_id:
+        return  # Ignore DMs
+    
+    # Fetch the member object
+    guild = await client.fetch_guild(message.guild_id)
+    member = await guild.fetch_member(message.author.id)
+    
+    if message.content == "!memberinfo":
+        # Create an embed with member info
+        embed = Embed(
+            title=f"Member: {member.display_name}",
+            color=0x5865F2
+        )
+        embed.add_field(name="User ID", value=str(member.user.id))
+        embed.add_field(name="Nickname", value=member.nick or "None")
+        embed.add_field(name="Roles", value=str(len(member.roles)))
+        
+        if member.joined_at:
+            embed.add_field(name="Joined", value=member.joined_at[:10])
+        
+        if member.communication_disabled_until:
+            embed.add_field(
+                name="Timed Out Until",
+                value=member.communication_disabled_until,
+                inline=False
+            )
+        
+        await message.reply(embed=embed)
+    
+    elif message.content.startswith("!timeout"):
+        # Timeout a mentioned user
+        if message.mentions:
+            target = await guild.fetch_member(message.mentions[0].id)
+            
+            # Timeout for 10 minutes
+            until = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+            await target.timeout(until=until, reason="Moderator action")
+            
+            await message.reply(f"Timed out {target.mention} for 10 minutes")
+    
+    elif message.content.startswith("!role add"):
+        # Example: !role add @user 123456789
+        parts = message.content.split()
+        if len(parts) >= 4 and message.mentions:
+            target = await guild.fetch_member(message.mentions[0].id)
+            role_id = int(parts[3])
+            
+            await target.add_role(role_id, reason="Moderator action")
+            await message.reply(f"Added role to {target.mention}")
+
+client.run()
+```
+
+## Related Models
+
+- [User](/api/models/user) - The underlying user object
+- [Guild](/api/models/guild) - The guild this member belongs to
+- [Role](/api/models/role) - Roles that members can have
+- [VoiceState](/api/models/voice) - Voice state information for members

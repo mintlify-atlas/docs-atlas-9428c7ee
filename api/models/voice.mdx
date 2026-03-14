@@ -1,0 +1,225 @@
+---
+title: VoiceState
+description: Represents a user's voice state in a guild
+---
+
+## Overview
+
+The `VoiceState` class represents a user's voice state in a guild, including which channel they're connected to, mute/deaf status, and other voice-related information.
+
+## Class Definition
+
+```python
+from fluxer.models import VoiceState
+
+@dataclass(slots=True)
+class VoiceState:
+    """Represents a user's voice state in a guild."""
+```
+
+## Properties
+
+<ResponseField name="user_id" type="int" required>
+  The user ID this voice state belongs to
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The guild ID this voice state is for
+</ResponseField>
+
+<ResponseField name="channel_id" type="int | None">
+  The voice channel ID the user is connected to (None if disconnected)
+</ResponseField>
+
+<ResponseField name="session_id" type="str | None">
+  The session ID for this voice connection
+</ResponseField>
+
+<ResponseField name="mute" type="bool" default="False">
+  Whether the user is server muted
+</ResponseField>
+
+<ResponseField name="deaf" type="bool" default="False">
+  Whether the user is server deafened
+</ResponseField>
+
+<ResponseField name="self_mute" type="bool" default="False">
+  Whether the user has muted themselves
+</ResponseField>
+
+<ResponseField name="self_deaf" type="bool" default="False">
+  Whether the user has deafened themselves
+</ResponseField>
+
+<ResponseField name="self_stream" type="bool" default="False">
+  Whether the user is streaming
+</ResponseField>
+
+<ResponseField name="self_video" type="bool" default="False">
+  Whether the user's camera is enabled
+</ResponseField>
+
+<ResponseField name="suppress" type="bool" default="False">
+  Whether the user is suppressed (e.g., in stage channels)
+</ResponseField>
+
+<ResponseField name="request_to_speak_timestamp" type="str | None">
+  ISO 8601 timestamp when the user requested to speak (for stage channels)
+</ResponseField>
+
+<ResponseField name="member" type="GuildMember | None">
+  The guild member this voice state belongs to (if available)
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None
+) -> VoiceState
+```
+
+Construct a VoiceState instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw voice state object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+## Usage Example
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_voice_state_update(member, before, after):
+    """
+    Called when a member's voice state changes.
+    
+    Args:
+        member: The GuildMember whose voice state changed
+        before: The VoiceState before the change
+        after: The VoiceState after the change
+    """
+    
+    # User joined a voice channel
+    if before.channel_id is None and after.channel_id is not None:
+        print(f"{member.display_name} joined voice channel {after.channel_id}")
+        
+        # Send a message to a text channel
+        channel = await client.fetch_channel(NOTIFICATION_CHANNEL_ID)
+        await channel.send(
+            f"{member.mention} joined <#{after.channel_id}>"
+        )
+    
+    # User left a voice channel
+    elif before.channel_id is not None and after.channel_id is None:
+        print(f"{member.display_name} left voice channel {before.channel_id}")
+    
+    # User moved between channels
+    elif before.channel_id != after.channel_id:
+        print(
+            f"{member.display_name} moved from {before.channel_id} "
+            f"to {after.channel_id}"
+        )
+    
+    # User muted/unmuted themselves
+    if before.self_mute != after.self_mute:
+        if after.self_mute:
+            print(f"{member.display_name} muted themselves")
+        else:
+            print(f"{member.display_name} unmuted themselves")
+    
+    # User started/stopped streaming
+    if before.self_stream != after.self_stream:
+        if after.self_stream:
+            print(f"{member.display_name} started streaming")
+        else:
+            print(f"{member.display_name} stopped streaming")
+
+@client.event
+async def on_message(message):
+    if message.content == "!voiceinfo":
+        if not message.guild_id:
+            return
+        
+        # Get the author's member object
+        guild = await client.fetch_guild(message.guild_id)
+        member = await guild.fetch_member(message.author.id)
+        
+        # Check if they have a voice state (in voice chat)
+        # Note: You'd need to track voice states via events
+        # This is just an example structure
+        
+        embed = Embed(
+            title="Voice State Info",
+            description=f"Information for {member.display_name}",
+            color=0x5865F2
+        )
+        
+        # In practice, you'd retrieve the voice state from your cache
+        # embed.add_field(name="Channel", value=f"<#{voice_state.channel_id}>")
+        # embed.add_field(name="Muted", value="Yes" if voice_state.self_mute else "No")
+        # embed.add_field(name="Deafened", value="Yes" if voice_state.self_deaf else "No")
+        # embed.add_field(name="Streaming", value="Yes" if voice_state.self_stream else "No")
+        
+        await message.reply(embed=embed)
+
+client.run()
+```
+
+## Voice State Properties
+
+### Understanding Mute/Deaf States
+
+- **`mute`**: Server muted (moderator action)
+- **`deaf`**: Server deafened (moderator action)
+- **`self_mute`**: User muted themselves
+- **`self_deaf`**: User deafened themselves
+
+```python
+if voice_state.mute:
+    print("User is server muted")
+if voice_state.self_mute:
+    print("User muted themselves")
+```
+
+### Streaming and Video
+
+- **`self_stream`**: User is sharing their screen
+- **`self_video`**: User has their camera on
+
+```python
+if voice_state.self_stream:
+    print("User is streaming!")
+if voice_state.self_video:
+    print("User has video enabled")
+```
+
+### Stage Channels
+
+For stage channels, the `suppress` and `request_to_speak_timestamp` fields are relevant:
+
+```python
+if voice_state.suppress:
+    print("User is suppressed (audience member in stage)")
+if voice_state.request_to_speak_timestamp:
+    print(f"User requested to speak at {voice_state.request_to_speak_timestamp}")
+```
+
+## Related Models
+
+- [GuildMember](/api/models/member) - The member object associated with the voice state
+- [Channel](/api/models/channel) - Voice channels that users connect to
+- [Guild](/api/models/guild) - The guild where voice activity occurs

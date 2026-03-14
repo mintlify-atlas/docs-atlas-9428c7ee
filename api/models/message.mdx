@@ -1,0 +1,386 @@
+---
+title: Message
+description: Represents a message in a Fluxer channel
+---
+
+## Overview
+
+The `Message` class represents a message sent in a Fluxer channel. It provides methods for replying, editing, deleting, and managing reactions.
+
+## Class Definition
+
+```python
+from fluxer.models import Message
+
+@dataclass(slots=True)
+class Message:
+    """Represents a message in a Fluxer channel."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the message
+</ResponseField>
+
+<ResponseField name="channel_id" type="int" required>
+  The ID of the channel this message was sent in
+</ResponseField>
+
+<ResponseField name="content" type="str" required>
+  The text content of the message
+</ResponseField>
+
+<ResponseField name="author" type="User" required>
+  The user who sent the message
+</ResponseField>
+
+<ResponseField name="timestamp" type="str" required>
+  ISO 8601 timestamp when the message was sent
+</ResponseField>
+
+<ResponseField name="edited_timestamp" type="str | None">
+  ISO 8601 timestamp when the message was last edited
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild (None for DMs)
+</ResponseField>
+
+<ResponseField name="embeds" type="list[dict[str, Any]]" default="[]">
+  List of embed objects attached to the message
+</ResponseField>
+
+<ResponseField name="attachments" type="list[Attachment]" default="[]">
+  List of file attachments
+</ResponseField>
+
+<ResponseField name="mentions" type="list[User]" default="[]">
+  List of users mentioned in the message
+</ResponseField>
+
+<ResponseField name="pinned" type="bool" default="False">
+  Whether the message is pinned
+</ResponseField>
+
+<ResponseField name="reactions" type="list[Reaction]" default="[]">
+  List of reactions on the message
+</ResponseField>
+
+<ResponseField name="referenced_message" type="Message | None">
+  The message that was replied to (if this is a reply)
+</ResponseField>
+
+### Computed Properties
+
+<ResponseField name="created_at" type="datetime">
+  When the message was created (derived from snowflake ID)
+</ResponseField>
+
+<ResponseField name="channel" type="Channel | None">
+  The channel this message was sent in (if cached)
+</ResponseField>
+
+<ResponseField name="guild" type="Guild | None">
+  The guild this message was sent in (if cached)
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> Message
+```
+
+Construct a Message instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw message object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+### send
+
+```python
+async def send(
+    content: str | None = None,
+    *,
+    embed: Embed | None = None,
+    embeds: list[Embed] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a message to the same channel (without replying).
+
+<ParamField path="content" type="str | None">
+  The message content
+</ParamField>
+
+<ParamField path="embed" type="Embed | None">
+  A single embed to include
+</ParamField>
+
+<ParamField path="embeds" type="list[Embed] | None">
+  Multiple embeds to include
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach
+</ParamField>
+
+**Returns:** The created `Message` object
+
+### reply
+
+```python
+async def reply(
+    content: str | None = None,
+    *,
+    embed: Embed | None = None,
+    embeds: list[Embed] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Reply to this message with a message reference.
+
+<ParamField path="content" type="str | None">
+  The message content
+</ParamField>
+
+<ParamField path="embed" type="Embed | None">
+  A single embed to include
+</ParamField>
+
+<ParamField path="embeds" type="list[Embed] | None">
+  Multiple embeds to include
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach
+</ParamField>
+
+**Returns:** The created `Message` object
+
+**Example:**
+```python
+@client.event
+async def on_message(message):
+    if message.content == "!ping":
+        await message.reply("Pong!")
+```
+
+### send_to_channel
+
+```python
+async def send_to_channel(
+    channel_id: int | str,
+    content: str | None = None,
+    *,
+    embed: Embed | None = None,
+    embeds: list[Embed] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a message to a different channel. Useful for forwarding content or sending notifications.
+
+<ParamField path="channel_id" type="int | str" required>
+  The target channel ID
+</ParamField>
+
+<ParamField path="content" type="str | None">
+  The message content
+</ParamField>
+
+**Returns:** The created `Message` object
+
+### edit
+
+```python
+async def edit(content: str | None = None, **kwargs: Any) -> Message
+```
+
+Edit this message.
+
+<ParamField path="content" type="str | None">
+  New message content
+</ParamField>
+
+**Returns:** The updated `Message` object
+
+**Example:**
+```python
+message = await channel.send("Original content")
+await message.edit("Edited content")
+```
+
+### delete
+
+```python
+async def delete() -> None
+```
+
+Delete this message.
+
+**Example:**
+```python
+await message.delete()
+```
+
+### add_reaction
+
+```python
+async def add_reaction(emoji: str | PartialEmoji) -> None
+```
+
+Add a reaction to this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to react with (unicode string or PartialEmoji)
+</ParamField>
+
+**Example:**
+```python
+# Unicode emoji
+await message.add_reaction("👍")
+
+# Custom emoji
+await message.add_reaction("<:name:123456789>")
+```
+
+### remove_reaction
+
+```python
+async def remove_reaction(
+    emoji: str | PartialEmoji,
+    user: User | int | str = "@me"
+) -> None
+```
+
+Remove a reaction from this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to remove
+</ParamField>
+
+<ParamField path="user" type="User | int | str" default="@me">
+  The user or user ID to remove the reaction from
+</ParamField>
+
+**Example:**
+```python
+# Remove your own reaction
+await message.remove_reaction("👍")
+
+# Remove another user's reaction
+await message.remove_reaction("👍", user_id)
+```
+
+### clear_reactions
+
+```python
+async def clear_reactions() -> None
+```
+
+Remove all reactions from this message.
+
+**Example:**
+```python
+await message.clear_reactions()
+```
+
+### clear_reaction
+
+```python
+async def clear_reaction(emoji: str | PartialEmoji) -> None
+```
+
+Remove all reactions of a specific emoji from this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to clear all reactions for
+</ParamField>
+
+**Example:**
+```python
+await message.clear_reaction("👍")
+```
+
+## Usage Example
+
+```python
+import fluxer
+from fluxer import Embed
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    # Ignore messages from bots
+    if message.author.bot:
+        return
+    
+    if message.content == "!info":
+        # Create an embed with message info
+        embed = Embed(
+            title="Message Info",
+            description=f"Message ID: {message.id}",
+            color=0x5865F2
+        )
+        embed.add_field(name="Author", value=message.author.mention)
+        embed.add_field(name="Channel", value=f"<#{message.channel_id}>")
+        embed.add_field(name="Created", value=str(message.created_at))
+        
+        if message.edited_timestamp:
+            embed.add_field(name="Edited", value=message.edited_timestamp)
+        
+        await message.reply(embed=embed)
+    
+    elif message.content == "!react":
+        # Add multiple reactions
+        await message.add_reaction("👍")
+        await message.add_reaction("❤️")
+        await message.add_reaction("🎉")
+    
+    elif message.content.startswith("!edit"):
+        # Send a message and edit it
+        msg = await message.channel.send("Original message")
+        await msg.edit("Edited message!")
+    
+    elif message.content == "!quote" and message.referenced_message:
+        # Get the quoted message
+        quoted = message.referenced_message
+        await message.channel.send(
+            f"{quoted.author} said: {quoted.content}"
+        )
+
+client.run()
+```
+
+## Related Models
+
+- [Channel](/api/models/channel) - Represents a channel containing messages
+- [User](/api/models/user) - Represents a message author
+- [Embed](/api/models/embed) - Rich embed builder
+- [Reaction](/api/models/reaction) - Represents message reactions

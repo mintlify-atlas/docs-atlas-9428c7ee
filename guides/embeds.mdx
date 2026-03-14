@@ -1,0 +1,394 @@
+---
+title: Embeds
+description: Create rich, formatted embed messages with the Embed builder
+---
+
+## Overview
+
+Embeds are rich message components that can display formatted text, images, fields, and more. The `Embed` class provides a fluent builder API for creating beautiful message embeds.
+
+## Creating Embeds
+
+Create an embed with basic properties:
+
+```python
+from fluxer import Embed
+
+embed = Embed(
+    title="My Embed Title",
+    description="This is the embed description",
+    color=0x5865f2  # Discord blurple
+)
+```
+
+## Embed Properties
+
+The `Embed` class supports these properties:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `title` | `str \| None` | Main title text |
+| `description` | `str \| None` | Main body text |
+| `url` | `str \| None` | URL to make the title clickable |
+| `color` | `int \| None` | Color bar on the left (hex color as int) |
+| `timestamp` | `str \| None` | ISO 8601 timestamp |
+| `footer` | `dict \| None` | Footer section |
+| `image` | `dict \| None` | Large image |
+| `thumbnail` | `dict \| None` | Small thumbnail image |
+| `author` | `dict \| None` | Author section |
+| `fields` | `list[dict]` | List of field objects |
+
+## Setting Footer
+
+Add a footer to your embed:
+
+```python
+embed = Embed(title="Status")
+embed.set_footer(text="Bot v1.0", icon_url="https://example.com/icon.png")
+```
+
+The footer appears at the bottom of the embed with optional icon.
+
+## Adding Images
+
+### Large Image
+
+```python
+embed.set_image(url="https://example.com/large-image.png")
+```
+
+### Thumbnail
+
+```python
+embed.set_thumbnail(url="https://example.com/thumbnail.png")
+```
+
+<Note>
+Images must be publicly accessible URLs. The Fluxer API will fetch and display them.
+</Note>
+
+## Setting Author
+
+Add an author section at the top of the embed:
+
+```python
+embed.set_author(
+    name="Author Name",
+    url="https://example.com",  # Optional clickable link
+    icon_url="https://example.com/avatar.png"  # Optional icon
+)
+```
+
+## Adding Fields
+
+Fields allow you to create structured data displays:
+
+```python
+embed = Embed(title="User Info")
+
+# Add fields
+embed.add_field(name="Username", value="JohnDoe", inline=True)
+embed.add_field(name="ID", value="123456789", inline=True)
+embed.add_field(name="Joined", value="2024-01-01", inline=False)
+```
+
+### Inline Fields
+
+Fields with `inline=True` appear side-by-side (up to 3 per row):
+
+```python
+embed.add_field(name="Field 1", value="Value 1", inline=True)
+embed.add_field(name="Field 2", value="Value 2", inline=True)
+embed.add_field(name="Field 3", value="Value 3", inline=True)
+```
+
+Fields with `inline=False` take the full width:
+
+```python
+embed.add_field(name="Full Width Field", value="This takes the whole row", inline=False)
+```
+
+## Method Chaining
+
+All builder methods return `self`, allowing for fluent chaining:
+
+```python
+embed = (Embed()
+    .set_author(name="Bot Name", icon_url="https://example.com/icon.png")
+    .set_thumbnail(url="https://example.com/thumb.png")
+    .add_field(name="Field 1", value="Value 1")
+    .add_field(name="Field 2", value="Value 2")
+    .set_footer(text="Footer text")
+)
+```
+
+## Sending Embeds
+
+### In Message Replies
+
+```python
+@bot.command()
+async def info(ctx):
+    embed = Embed(
+        title="Bot Information",
+        description="I'm a helpful bot!",
+        color=0x00ff00
+    )
+    
+    await ctx.reply(embed=embed)
+```
+
+### In Channel Messages
+
+```python
+channel = await bot.fetch_channel(channel_id)
+
+embed = Embed(title="Announcement", color=0xff0000)
+embed.set_description("Important message!")
+
+await channel.send(embed=embed)
+```
+
+### Multiple Embeds
+
+Send up to 10 embeds in a single message:
+
+```python
+embed1 = Embed(title="Embed 1", description="First embed")
+embed2 = Embed(title="Embed 2", description="Second embed")
+
+await ctx.reply(embeds=[embed1, embed2])
+```
+
+<Warning>
+Fluxer supports up to 10 embeds per message. Exceeding this limit will cause the API request to fail.
+</Warning>
+
+## Colors
+
+Colors are specified as integers (hex values):
+
+```python
+# Common colors
+BLURPLE = 0x5865f2
+GREEN = 0x57f287
+YELLOW = 0xfee75c
+RED = 0xed4245
+BLACK = 0x000000
+WHITE = 0xffffff
+
+embed = Embed(title="Success", color=GREEN)
+```
+
+## Timestamps
+
+Add ISO 8601 timestamps to show when events occurred:
+
+```python
+from datetime import datetime
+
+embed = Embed(
+    title="Event Logged",
+    timestamp=datetime.utcnow().isoformat()
+)
+```
+
+The timestamp appears in the footer and is displayed in the user's local timezone.
+
+## Complete Examples
+
+### User Profile Embed
+
+```python
+@bot.command()
+async def profile(ctx, user_id: int):
+    user = await bot.fetch_user(str(user_id))
+    
+    embed = Embed(
+        title=f"{user.display_name}'s Profile",
+        color=user.avatar_color or 0x5865f2
+    )
+    
+    embed.set_thumbnail(url=user.avatar_url or user.default_avatar_url)
+    embed.add_field(name="Username", value=user.username, inline=True)
+    embed.add_field(name="ID", value=str(user.id), inline=True)
+    embed.add_field(name="Bot", value="Yes" if user.bot else "No", inline=True)
+    embed.set_footer(text=f"Created at {user.created_at}")
+    
+    await ctx.reply(embed=embed)
+```
+
+### Server Stats Embed
+
+```python
+@bot.command()
+async def stats(ctx):
+    from datetime import datetime
+    
+    embed = Embed(
+        title="📊 Server Statistics",
+        description=f"Stats for {ctx.guild.name if ctx.guild else 'this guild'}",
+        color=0x5865f2,
+        timestamp=datetime.utcnow().isoformat()
+    )
+    
+    guild_count = len(bot.guilds)
+    
+    embed.add_field(
+        name="Guilds",
+        value=str(guild_count),
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Uptime",
+        value="24 hours",  # Calculate actual uptime
+        inline=True
+    )
+    
+    embed.set_footer(
+        text="Bot Statistics",
+        icon_url=bot.user.avatar_url if bot.user else None
+    )
+    
+    await ctx.reply(embed=embed)
+```
+
+### Error Embed
+
+```python
+def create_error_embed(error_message: str) -> Embed:
+    """Create a standardized error embed."""
+    embed = Embed(
+        title="❌ Error",
+        description=error_message,
+        color=0xed4245  # Red
+    )
+    
+    embed.set_footer(text="If this persists, contact support")
+    
+    return embed
+
+# Usage
+@bot.command()
+async def risky_command(ctx):
+    try:
+        # ... command logic
+        pass
+    except Exception as e:
+        error_embed = create_error_embed(f"Command failed: {str(e)}")
+        await ctx.reply(embed=error_embed)
+```
+
+### Help Command Embed
+
+```python
+@bot.command()
+async def help(ctx):
+    embed = Embed(
+        title="🤖 Bot Commands",
+        description="Here are all available commands",
+        color=0x5865f2
+    )
+    
+    embed.add_field(
+        name="!ping",
+        value="Check bot latency",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="!info",
+        value="Get bot information",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="!help",
+        value="Show this message",
+        inline=False
+    )
+    
+    embed.set_footer(
+        text=f"Requested by {ctx.author.display_name}",
+        icon_url=ctx.author.avatar_url or ctx.author.default_avatar_url
+    )
+    
+    await ctx.reply(embed=embed)
+```
+
+## Converting to Dictionary
+
+The `to_dict()` method converts an embed to the API format:
+
+```python
+embed = Embed(title="Example", description="Test")
+data = embed.to_dict()
+
+# Returns:
+# {
+#     "title": "Example",
+#     "description": "Test"
+# }
+```
+
+This is used internally when sending embeds, but you can also use it for:
+
+- Storing embeds in a database
+- Sending embeds via webhooks
+- Debugging embed structure
+
+## Advanced: Dynamic Embeds
+
+```python
+class EmbedBuilder:
+    """Helper class for common embed patterns."""
+    
+    @staticmethod
+    def success(message: str) -> Embed:
+        return Embed(
+            title="✅ Success",
+            description=message,
+            color=0x57f287
+        )
+    
+    @staticmethod
+    def error(message: str) -> Embed:
+        return Embed(
+            title="❌ Error",
+            description=message,
+            color=0xed4245
+        )
+    
+    @staticmethod
+    def info(message: str) -> Embed:
+        return Embed(
+            title="ℹ️ Info",
+            description=message,
+            color=0x5865f2
+        )
+    
+    @staticmethod
+    def warning(message: str) -> Embed:
+        return Embed(
+            title="⚠️ Warning",
+            description=message,
+            color=0xfee75c
+        )
+
+# Usage
+await ctx.reply(embed=EmbedBuilder.success("Operation completed!"))
+await ctx.reply(embed=EmbedBuilder.error("Something went wrong!"))
+```
+
+## Implementation Details
+
+The embed implementation is in `fluxer/models/embed.py`:
+
+- **Embed class** (embed.py:8-27): Dataclass with all embed properties
+- **Builder methods** (embed.py:29-55): Fluent API for setting properties
+- **to_dict()** (embed.py:57-81): Serialization to API format
+
+<Tip>
+Create helper functions or classes for common embed patterns (success, error, info) to maintain consistency across your bot.
+</Tip>

@@ -1,0 +1,799 @@
+---
+title: HTTPClient
+description: Async HTTP client for the Fluxer REST API with rate limiting and error handling
+---
+
+## HTTPClient
+
+Async HTTP client for the Fluxer REST API. Handles rate limiting, retries on 429/5xx, connection errors, and error mapping.
+
+### Constructor
+
+```python
+HTTPClient(
+    token: str,
+    *,
+    is_bot: bool = True,
+    api_url: str = "https://api.fluxer.app/v1",
+    max_retries: int = 4,
+    retry_forever: bool = False
+)
+```
+
+<ParamField path="token" type="str" required>
+  Bot or user token.
+</ParamField>
+
+<ParamField path="is_bot" type="bool" default="True">
+  Whether this is a bot token (adds "Bot" prefix to auth header).
+</ParamField>
+
+<ParamField path="api_url" type="str" default="https://api.fluxer.app/v1">
+  Base URL for the API. Use this to connect to self-hosted Fluxer instances.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="4">
+  Maximum number of retries for failed requests.
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry requests indefinitely.
+</ParamField>
+
+### Context Manager Usage
+
+```python
+async with HTTPClient(token) as http:
+    data = await http.get_channel("123456789")
+```
+
+### Core Request Method
+
+#### request
+
+```python
+async def request(
+    route: Route,
+    *,
+    json: Any = None,
+    data: aiohttp.FormData | None = None,
+    params: dict[str, Any] | None = None,
+    reason: str | None = None,
+    max_retries: int | None = None,
+    retry_forever: bool | None = None
+) -> Any
+```
+
+Make an authenticated request to the Fluxer API.
+
+<ParamField path="route" type="Route" required>
+  Route object containing method, path, and parameters.
+</ParamField>
+
+<ParamField path="json" type="Any" default="None">
+  JSON payload to send.
+</ParamField>
+
+<ParamField path="data" type="aiohttp.FormData | None" default="None">
+  Form data to send (for file uploads).
+</ParamField>
+
+<ParamField path="params" type="dict[str, Any] | None" default="None">
+  Query parameters.
+</ParamField>
+
+<ParamField path="reason" type="str | None" default="None">
+  Audit log reason (sent as X-Audit-Log-Reason header).
+</ParamField>
+
+<ParamField path="max_retries" type="int | None" default="None">
+  Override the default max_retries for this request.
+</ParamField>
+
+<ParamField path="retry_forever" type="bool | None" default="None">
+  Override the default retry_forever for this request.
+</ParamField>
+
+**Returns:** Parsed JSON response, or None for 204 No Content.
+
+## Rate Limiting
+
+The HTTPClient automatically handles rate limits using Fluxer's response headers:
+
+- `X-RateLimit-Limit` - Max requests in window
+- `X-RateLimit-Remaining` - Requests left
+- `X-RateLimit-Reset` - Unix timestamp when limit resets
+- `X-RateLimit-Reset-After` - Seconds until reset
+- `X-RateLimit-Bucket` - Opaque bucket identifier
+
+The client will automatically wait when rate limited and supports both per-route and global rate limits.
+
+## Gateway Methods
+
+### get_gateway
+
+```python
+async def get_gateway() -> dict[str, Any]
+```
+
+GET `/gateway/bot` — Get the WebSocket URL.
+
+### get_gateway_bot
+
+```python
+async def get_gateway_bot() -> dict[str, Any]
+```
+
+GET `/gateway/bot` — Get gateway URL + sharding info.
+
+## User Methods
+
+### get_current_user
+
+```python
+async def get_current_user() -> dict[str, Any]
+```
+
+GET `/users/@me` — Get the current user.
+
+### get_user
+
+```python
+async def get_user(user_id: int | str) -> dict[str, Any]
+```
+
+GET `/users/{user_id}` — Get a user by ID.
+
+### get_user_profile
+
+```python
+async def get_user_profile(
+    user_id: int | str,
+    *,
+    guild_id: int | str | None = None
+) -> dict[str, Any]
+```
+
+GET `/users/{user_id}/profile` — Get a user's full profile.
+
+<ParamField path="user_id" type="int | str" required>
+  The user ID to fetch.
+</ParamField>
+
+<ParamField path="guild_id" type="int | str | None" default="None">
+  Optional guild ID for guild-specific profile data.
+</ParamField>
+
+### create_dm
+
+```python
+async def create_dm(user_id: int | str) -> dict[str, Any]
+```
+
+POST `/users/@me/channels` — Open a DM channel with a user.
+
+### get_current_user_guilds
+
+```python
+async def get_current_user_guilds() -> list[dict[str, Any]]
+```
+
+GET `/users/@me/guilds` — Get guilds the current user is in.
+
+### modify_current_user
+
+```python
+async def modify_current_user(
+    *,
+    username: str | None = None,
+    avatar: bytes | None = None,
+    banner: bytes | None = None,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+PATCH `/users/@me` — Modify the current user's profile.
+
+## Channel Methods
+
+### get_channel
+
+```python
+async def get_channel(channel_id: int | str) -> dict[str, Any]
+```
+
+GET `/channels/{channel_id}` — Get a channel by ID.
+
+### modify_channel
+
+```python
+async def modify_channel(
+    channel_id: int | str,
+    *,
+    name: str | None = None,
+    type: int | None = None,
+    topic: str | None = None,
+    position: int | None = None,
+    parent_id: int | str | None = None,
+    nsfw: bool | None = None,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+PATCH `/channels/{channel_id}` — Modify a channel.
+
+### delete_channel
+
+```python
+async def delete_channel(channel_id: int | str) -> None
+```
+
+DELETE `/channels/{channel_id}` — Delete a channel.
+
+### edit_channel_permissions
+
+```python
+async def edit_channel_permissions(
+    channel_id: int | str,
+    overwrite_id: int | str,
+    *,
+    allow: int | str | None = None,
+    deny: int | str | None = None,
+    type: int = 0,
+    **kwargs: Any
+) -> None
+```
+
+PUT `/channels/{channel_id}/permissions/{overwrite_id}` — Edit channel permission overwrites.
+
+## Message Methods
+
+### send_message
+
+```python
+async def send_message(
+    channel_id: int | str,
+    *,
+    content: str | None = None,
+    embed: Any | None = None,
+    embeds: list[Any] | None = None,
+    files: list[Any] | None = None,
+    message_reference: dict[str, Any] | None = None
+) -> dict[str, Any]
+```
+
+POST `/channels/{channel_id}/messages` — Send a message.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel to send the message to.
+</ParamField>
+
+<ParamField path="content" type="str | None" default="None">
+  The message content.
+</ParamField>
+
+<ParamField path="embed" type="Any | None" default="None">
+  Single embed object (Embed or dict).
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None" default="None">
+  List of embed objects.
+</ParamField>
+
+<ParamField path="files" type="list[Any] | None" default="None">
+  List of file objects to attach.
+</ParamField>
+
+<ParamField path="message_reference" type="dict[str, Any] | None" default="None">
+  Reference to another message for replies.
+</ParamField>
+
+### get_message
+
+```python
+async def get_message(
+    channel_id: int | str,
+    message_id: int | str
+) -> dict[str, Any]
+```
+
+GET `/channels/{channel_id}/messages/{message_id}` — Fetch a single message.
+
+### get_messages
+
+```python
+async def get_messages(
+    channel_id: int | str,
+    *,
+    limit: int = 50,
+    before: int | str | None = None,
+    after: int | str | None = None
+) -> list[dict[str, Any]]
+```
+
+GET `/channels/{channel_id}/messages` — Fetch multiple messages.
+
+### edit_message
+
+```python
+async def edit_message(
+    channel_id: int | str,
+    message_id: int | str,
+    *,
+    content: str | None = None,
+    embeds: list[dict[str, Any]] | None = None
+) -> dict[str, Any]
+```
+
+PATCH `/channels/{channel_id}/messages/{message_id}` — Edit a message.
+
+### delete_message
+
+```python
+async def delete_message(
+    channel_id: int | str,
+    message_id: int | str
+) -> None
+```
+
+DELETE `/channels/{channel_id}/messages/{message_id}` — Delete a message.
+
+### delete_messages
+
+```python
+async def delete_messages(
+    channel_id: int | str,
+    message_ids: list[int | str]
+) -> None
+```
+
+POST `/channels/{channel_id}/messages/bulk-delete` — Bulk delete messages.
+
+## Guild Methods
+
+### get_guild
+
+```python
+async def get_guild(guild_id: int | str) -> dict[str, Any]
+```
+
+GET `/guilds/{guild_id}` — Get a guild by ID.
+
+### get_guild_channels
+
+```python
+async def get_guild_channels(guild_id: int | str) -> list[dict[str, Any]]
+```
+
+GET `/guilds/{guild_id}/channels` — Get a guild's channels.
+
+### get_guild_member
+
+```python
+async def get_guild_member(
+    guild_id: int | str,
+    user_id: int | str
+) -> dict[str, Any]
+```
+
+GET `/guilds/{guild_id}/members/{user_id}` — Get a specific guild member.
+
+### get_guild_members
+
+```python
+async def get_guild_members(
+    guild_id: int | str,
+    *,
+    limit: int = 100,
+    after: int | str | None = None
+) -> list[dict[str, Any]]
+```
+
+GET `/guilds/{guild_id}/members` — List guild members.
+
+### create_guild
+
+```python
+async def create_guild(
+    *,
+    name: str,
+    icon: bytes | None = None
+) -> dict[str, Any]
+```
+
+POST `/guilds` — Create a new guild.
+
+### delete_guild
+
+```python
+async def delete_guild(guild_id: int | str) -> None
+```
+
+DELETE `/guilds/{guild_id}` — Delete a guild.
+
+### modify_guild
+
+```python
+async def modify_guild(
+    guild_id: int | str,
+    *,
+    name: str | None = None,
+    icon: bytes | None = None,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+PATCH `/guilds/{guild_id}` — Modify guild settings.
+
+### create_guild_channel
+
+```python
+async def create_guild_channel(
+    guild_id: int | str,
+    *,
+    name: str,
+    type: int = 0,
+    topic: str | None = None,
+    bitrate: int | None = None,
+    user_limit: int | None = None,
+    position: int | None = None,
+    parent_id: int | str | None = None,
+    nsfw: bool = False,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+POST `/guilds/{guild_id}/channels` — Create a channel.
+
+## Role Methods
+
+### get_guild_roles
+
+```python
+async def get_guild_roles(guild_id: int | str) -> list[dict[str, Any]]
+```
+
+GET `/guilds/{guild_id}/roles` — Get a guild's roles.
+
+### create_guild_role
+
+```python
+async def create_guild_role(
+    guild_id: int | str,
+    *,
+    name: str | None = None,
+    permissions: int | None = None,
+    color: int = 0,
+    hoist: bool = False,
+    mentionable: bool = False,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+POST `/guilds/{guild_id}/roles` — Create a new role.
+
+### modify_guild_role
+
+```python
+async def modify_guild_role(
+    guild_id: int | str,
+    role_id: int | str,
+    *,
+    name: str | None = None,
+    permissions: int | None = None,
+    color: int | None = None,
+    hoist: bool | None = None,
+    mentionable: bool | None = None,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+PATCH `/guilds/{guild_id}/roles/{role_id}` — Modify a role.
+
+### delete_guild_role
+
+```python
+async def delete_guild_role(
+    guild_id: int | str,
+    role_id: int | str
+) -> None
+```
+
+DELETE `/guilds/{guild_id}/roles/{role_id}` — Delete a role.
+
+### add_guild_member_role
+
+```python
+async def add_guild_member_role(
+    guild_id: int | str,
+    user_id: int | str,
+    role_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+PUT `/guilds/{guild_id}/members/{user_id}/roles/{role_id}` — Add a role to a member.
+
+### remove_guild_member_role
+
+```python
+async def remove_guild_member_role(
+    guild_id: int | str,
+    user_id: int | str,
+    role_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+DELETE `/guilds/{guild_id}/members/{user_id}/roles/{role_id}` — Remove a role from a member.
+
+## Moderation Methods
+
+### kick_guild_member
+
+```python
+async def kick_guild_member(
+    guild_id: int | str,
+    user_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+DELETE `/guilds/{guild_id}/members/{user_id}` — Kick a member.
+
+### ban_guild_member
+
+```python
+async def ban_guild_member(
+    guild_id: int | str,
+    user_id: int | str,
+    *,
+    delete_message_days: int = 0,
+    delete_message_seconds: int = 0,
+    reason: str | None = None
+) -> None
+```
+
+PUT `/guilds/{guild_id}/bans/{user_id}` — Ban a member.
+
+### unban_guild_member
+
+```python
+async def unban_guild_member(
+    guild_id: int | str,
+    user_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+DELETE `/guilds/{guild_id}/bans/{user_id}` — Unban a user.
+
+### timeout_guild_member
+
+```python
+async def timeout_guild_member(
+    guild_id: int | str,
+    user_id: int | str,
+    *,
+    until: str | None = None,
+    reason: str | None = None
+) -> dict[str, Any]
+```
+
+PATCH `/guilds/{guild_id}/members/{user_id}` — Timeout a member.
+
+### modify_guild_member
+
+```python
+async def modify_guild_member(
+    guild_id: int | str,
+    user_id: int | str,
+    *,
+    nick: str | None = None,
+    roles: list[int | str] | None = None,
+    mute: bool | None = None,
+    deaf: bool | None = None,
+    channel_id: int | str | None = None,
+    communication_disabled_until: str | None = None,
+    reason: str | None = None,
+    **kwargs: Any
+) -> dict[str, Any]
+```
+
+PATCH `/guilds/{guild_id}/members/{user_id}` — Modify a guild member.
+
+## Webhook Methods
+
+### get_webhook
+
+```python
+async def get_webhook(webhook_id: int | str) -> dict[str, Any]
+```
+
+GET `/webhooks/{webhook_id}` — Get a webhook.
+
+### get_guild_webhooks
+
+```python
+async def get_guild_webhooks(guild_id: int | str) -> list[dict[str, Any]]
+```
+
+GET `/guilds/{guild_id}/webhooks` — Get all webhooks in a guild.
+
+### get_channel_webhooks
+
+```python
+async def get_channel_webhooks(channel_id: int | str) -> list[dict[str, Any]]
+```
+
+GET `/channels/{channel_id}/webhooks` — Get all webhooks in a channel.
+
+### create_webhook
+
+```python
+async def create_webhook(
+    channel_id: int | str,
+    *,
+    name: str,
+    avatar: str | None = None
+) -> dict[str, Any]
+```
+
+POST `/channels/{channel_id}/webhooks` — Create a webhook.
+
+### modify_webhook
+
+```python
+async def modify_webhook(
+    webhook_id: int | str,
+    *,
+    name: str | None = None,
+    avatar: str | None = None,
+    channel_id: int | str | None = None
+) -> dict[str, Any]
+```
+
+PATCH `/webhooks/{webhook_id}` — Modify a webhook.
+
+### delete_webhook
+
+```python
+async def delete_webhook(
+    webhook_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+DELETE `/webhooks/{webhook_id}` — Delete a webhook.
+
+### execute_webhook
+
+```python
+async def execute_webhook(
+    webhook_id: int | str,
+    token: str,
+    *,
+    content: str | None = None,
+    embeds: list[dict[str, Any]] | None = None,
+    username: str | None = None,
+    avatar_url: str | None = None,
+    wait: bool = False,
+    files: list[dict[str, Any]] | None = None
+) -> dict[str, Any] | None
+```
+
+POST `/webhooks/{webhook_id}/{token}` — Execute a webhook.
+
+## Reaction Methods
+
+### add_reaction
+
+```python
+async def add_reaction(
+    channel_id: int | str,
+    message_id: int | str,
+    emoji: str
+) -> None
+```
+
+PUT `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` — Add a reaction.
+
+### delete_reaction
+
+```python
+async def delete_reaction(
+    channel_id: int | str,
+    message_id: int | str,
+    emoji: str,
+    user_id: int | str = "@me"
+) -> None
+```
+
+DELETE `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/{user_id}` — Remove a reaction.
+
+### delete_all_reactions
+
+```python
+async def delete_all_reactions(
+    channel_id: int | str,
+    message_id: int | str
+) -> None
+```
+
+DELETE `/channels/{channel_id}/messages/{message_id}/reactions` — Remove all reactions.
+
+### delete_all_reactions_for_emoji
+
+```python
+async def delete_all_reactions_for_emoji(
+    channel_id: int | str,
+    message_id: int | str,
+    emoji: str
+) -> None
+```
+
+DELETE `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}` — Remove all reactions for a specific emoji.
+
+## Emoji Methods
+
+### get_guild_emojis
+
+```python
+async def get_guild_emojis(guild_id: int | str) -> list[dict[str, Any]]
+```
+
+GET `/guilds/{guild_id}/emojis` — Get all emojis for a guild.
+
+### get_guild_emoji
+
+```python
+async def get_guild_emoji(
+    guild_id: int | str,
+    emoji_id: int | str
+) -> dict[str, Any]
+```
+
+GET `/guilds/{guild_id}/emojis/{emoji_id}` — Get a specific emoji.
+
+### create_guild_emoji
+
+```python
+async def create_guild_emoji(
+    guild_id: int | str,
+    *,
+    name: str,
+    image: bytes,
+    roles: list[int | str] | None = None,
+    reason: str | None = None
+) -> dict[str, Any]
+```
+
+POST `/guilds/{guild_id}/emojis` — Create a new emoji.
+
+### delete_guild_emoji
+
+```python
+async def delete_guild_emoji(
+    guild_id: int | str,
+    emoji_id: int | str,
+    *,
+    reason: str | None = None
+) -> None
+```
+
+DELETE `/guilds/{guild_id}/emojis/{emoji_id}` — Delete an emoji.
+
+## Lifecycle Methods
+
+### close
+
+```python
+async def close() -> None
+```
+
+Close the underlying HTTP session.

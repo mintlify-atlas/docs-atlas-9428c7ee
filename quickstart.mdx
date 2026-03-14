@@ -1,80 +1,338 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Build your first Fluxer bot in minutes with fluxer.py
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, make sure you have:
 
-### Step 1: Set up your local environment
+- Python 3.10 or higher installed
+- fluxer.py installed (`pip install fluxer.py`)
+- A Fluxer bot token (see [Getting a Bot Token](#getting-a-bot-token))
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Your First Bot
+
+Let's create a simple bot with a ping command:
+
+<Steps>
+  <Step title="Create a new Python file">
+    Create a file named `bot.py`:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```python bot.py
+    import fluxer
+
+    bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+    @bot.event
+    async def on_ready():
+        print(f"Bot is ready! Logged in as {bot.user.username}")
+
+    @bot.command()
+    async def ping(ctx):
+        await ctx.reply("Pong!")
+
+    if __name__ == "__main__":
+        TOKEN = "your_bot_token"
+        bot.run(TOKEN)
+    ```
+  </Step>
+  
+  <Step title="Replace the token">
+    Replace `"your_bot_token"` with your actual bot token.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    <Warning>
+      Never commit your bot token to version control! Use environment variables in production.
+    </Warning>
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    For better security, use environment variables:
+    
+    ```python
+    import os
+    
+    TOKEN = os.getenv("FLUXER_BOT_TOKEN")
+    bot.run(TOKEN)
+    ```
+  </Step>
+  
+  <Step title="Run your bot">
+    Execute the script:
+    
+    ```bash
+    python bot.py
+    ```
+    
+    You should see:
+    ```
+    Bot is ready! Logged in as YourBotName
+    ```
+  </Step>
+  
+  <Step title="Test the command">
+    In any channel your bot has access to, type:
+    ```
+    !ping
+    ```
+    
+    The bot should respond with:
+    ```
+    Pong!
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Getting a Bot Token
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+To get a bot token from Fluxer:
 
-### Step 3: Go live
+<Steps>
+  <Step title="Visit the Fluxer Developer Portal">
+    Go to [fluxer.app](https://fluxer.app) and navigate to the developer section.
+  </Step>
+  
+  <Step title="Create a new application">
+    Click "New Application" and give your bot a name.
+  </Step>
+  
+  <Step title="Create a bot user">
+    In your application settings, navigate to the "Bot" section and click "Add Bot".
+  </Step>
+  
+  <Step title="Copy the token">
+    Click "Copy" under the token section. This is your bot token.
+    
+    <Warning>
+      Keep your token secret! Anyone with your token can control your bot.
+    </Warning>
+  </Step>
+  
+  <Step title="Invite the bot to your server">
+    Use the OAuth2 URL generator to create an invite link for your bot.
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Understanding the Code
 
-## Next steps
+Let's break down what's happening in our bot:
 
-Now that you have your docs running, explore these key features:
+### Creating the Bot
 
-<CardGroup cols={2}>
+```python
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+- `command_prefix="!"` - Commands start with `!` (e.g., `!ping`)
+- `intents=fluxer.Intents.default()` - Subscribe to common gateway events
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+### Event Handlers
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+```python
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+```
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+The `on_ready` event fires when the bot successfully connects to Fluxer. This is where you can:
+- Log connection information
+- Initialize databases
+- Start background tasks
 
-</CardGroup>
+### Commands
+
+```python
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+```
+
+The `@bot.command()` decorator registers a command. The function name becomes the command name (`!ping`).
+
+`ctx` is the context object (the message that triggered the command) with methods like:
+- `ctx.reply()` - Reply to the message
+- `ctx.author` - The user who sent the message
+- `ctx.channel` - The channel where the message was sent
+- `ctx.guild` - The guild (server) where the message was sent
+
+### Running the Bot
+
+```python
+bot.run(TOKEN)
+```
+
+This blocking call:
+1. Creates an event loop
+2. Connects to the Fluxer gateway
+3. Starts receiving and dispatching events
+4. Handles cleanup on shutdown
+
+## Adding More Commands
+
+Let's add some more useful commands:
+
+```python bot.py
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command()
+async def hello(ctx):
+    await ctx.reply(f"Hello, {ctx.author.display_name}!")
+
+@bot.command()
+async def echo(ctx, *, message: str):
+    """Repeat the user's message."""
+    await ctx.reply(message)
+
+@bot.command()
+async def add(ctx, a: int, b: int):
+    """Add two numbers."""
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+
+if __name__ == "__main__":
+    import os
+    TOKEN = os.getenv("FLUXER_BOT_TOKEN")
+    bot.run(TOKEN)
+```
+
+### Command with Arguments
+
+```python
+@bot.command()
+async def echo(ctx, *, message: str):
+    await ctx.reply(message)
+```
+
+The `*, message: str` syntax captures all remaining text after the command:
+- `!echo Hello, world!` → message = "Hello, world!"
+
+### Type Conversion
+
+```python
+@bot.command()
+async def add(ctx, a: int, b: int):
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+```
+
+Arguments are automatically converted to the specified type:
+- `!add 5 3` → a=5, b=3 (both integers)
+
+## Using the Client Class
+
+For more control, you can use the `Client` class instead:
+
+```python
+import fluxer
+
+client = fluxer.Client(intents=fluxer.Intents.default())
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user.username}")
+
+@client.event
+async def on_message(message):
+    # Ignore messages from bots
+    if message.author.bot:
+        return
+    
+    # Respond to "ping"
+    if message.content == "ping":
+        await message.reply("Pong!")
+    
+    # Echo messages starting with "echo:"
+    if message.content.startswith("echo:"):
+        text = message.content[5:].strip()
+        await message.reply(text)
+
+if __name__ == "__main__":
+    import os
+    TOKEN = os.getenv("FLUXER_BOT_TOKEN")
+    client.run(TOKEN)
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The `Client` class requires manual message parsing. Use `Bot` for automatic command handling.
 </Note>
+
+## Environment Variables
+
+For production bots, always use environment variables:
+
+<Tabs>
+  <Tab title="Linux/macOS">
+    ```bash
+    export FLUXER_BOT_TOKEN="your_token_here"
+    python bot.py
+    ```
+  </Tab>
+  
+  <Tab title="Windows PowerShell">
+    ```powershell
+    $env:FLUXER_BOT_TOKEN="your_token_here"
+    python bot.py
+    ```
+  </Tab>
+  
+  <Tab title=".env file">
+    Create a `.env` file:
+    ```
+    FLUXER_BOT_TOKEN=your_token_here
+    ```
+    
+    Load it with `python-dotenv`:
+    ```python
+    from dotenv import load_dotenv
+    import os
+    
+    load_dotenv()
+    TOKEN = os.getenv("FLUXER_BOT_TOKEN")
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bot Template" icon="file-code" href="https://github.com/PerpetualPossum/fluxer-py-template">
+    Use the batteries-included template for new bot projects
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/client">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/akarealemil/fluxer.py/tree/main/examples">
+    View more example bots and use cases
+  </Card>
+  <Card title="Cogs & Extensions" icon="puzzle-piece" href="/guides/cogs">
+    Learn how to organize your bot with cogs
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+### Bot doesn't respond to commands
+
+- Check that your bot has permission to read and send messages
+- Verify you're using the correct command prefix
+- Ensure the bot is online and connected (check the `on_ready` log)
+
+### "Login failure" error
+
+- Verify your token is correct
+- Make sure there are no extra spaces or quotes in your token
+- Check that your bot hasn't been deleted or regenerated
+
+### Events not firing
+
+- Check that you're subscribing to the right intents
+- Use `fluxer.Intents.all()` temporarily to debug
+- Verify your event handler names are correct (e.g., `on_message`, not `message`)

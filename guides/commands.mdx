@@ -1,0 +1,195 @@
+---
+title: Commands
+description: Learn how to create and manage text commands with the Bot class
+---
+
+## Overview
+
+The `Bot` class extends the base `Client` with a powerful command framework that makes it easy to create prefix-based commands. Commands use decorators for registration and include automatic argument parsing with type conversion.
+
+## Command Decorator
+
+Use the `@bot.command()` decorator to register functions as commands:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+```
+
+The function name becomes the command name unless you specify otherwise:
+
+```python
+@bot.command(name="hello")
+async def greet(ctx):
+    await ctx.reply(f"Hello, {ctx.author.display_name}!")
+```
+
+## Command Context
+
+Every command receives a `ctx` parameter which is actually the `Message` object that triggered the command. This gives you access to:
+
+- `ctx.author` - The user who sent the message
+- `ctx.channel` - The channel where the message was sent
+- `ctx.guild` - The guild (server) where the message was sent
+- `ctx.content` - The full message content
+- `ctx.reply()` - Reply to the message
+- `ctx.send()` - Send a message to the same channel
+
+```python
+@bot.command()
+async def info(ctx):
+    await ctx.reply(
+        f"Author: {ctx.author.display_name}\n"
+        f"Channel: {ctx.channel_id}\n"
+        f"Guild: {ctx.guild_id}"
+    )
+```
+
+## Command Arguments
+
+The command framework automatically parses arguments from the message content.
+
+### Positional Arguments
+
+```python
+@bot.command()
+async def add(ctx, a: int, b: int):
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+```
+
+Usage: `!add 5 10` → "5 + 10 = 15"
+
+### Type Conversion
+
+The framework automatically converts arguments based on type hints:
+
+- `int` - Converts to integer
+- `float` - Converts to float
+- `bool` - Converts "true", "1", "yes", "y" to `True`
+- `str` - No conversion (default)
+
+```python
+@bot.command()
+async def multiply(ctx, value: float, times: int):
+    result = value * times
+    await ctx.reply(f"{value} × {times} = {result}")
+```
+
+### Keyword-Only Arguments
+
+Use keyword-only arguments (after `*`) to capture all remaining text:
+
+```python
+@bot.command()
+async def say(ctx, *, message: str):
+    await ctx.send(message)
+```
+
+Usage: `!say Hello everyone! How are you?` → "Hello everyone! How are you?"
+
+### Default Values
+
+```python
+@bot.command()
+async def greet(ctx, name: str = "friend"):
+    await ctx.reply(f"Hello, {name}!")
+```
+
+Usage:
+- `!greet` → "Hello, friend!"
+- `!greet Alice` → "Hello, Alice!"
+
+## Error Handling
+
+Commands automatically handle missing required arguments:
+
+```python
+@bot.command()
+async def kick(ctx, user_id: int, *, reason: str):
+    # If user calls !kick without arguments, they get an error message
+    await ctx.reply(f"Kicked user {user_id} for: {reason}")
+```
+
+<Warning>
+If a user provides invalid arguments (e.g., text where a number is expected), the bot will send an error message automatically.
+</Warning>
+
+## Complete Example
+
+<Steps>
+  <Step title="Create your bot">
+    ```python
+    import fluxer
+
+    bot = fluxer.Bot(
+        command_prefix="!",
+        intents=fluxer.Intents.default()
+    )
+    ```
+  </Step>
+
+  <Step title="Add commands">
+    ```python
+    @bot.command()
+    async def ping(ctx):
+        await ctx.reply("Pong!")
+
+    @bot.command()
+    async def echo(ctx, *, message: str):
+        await ctx.send(message)
+
+    @bot.command()
+    async def userinfo(ctx):
+        user = ctx.author
+        await ctx.reply(
+            f"**User Info**\n"
+            f"Name: {user.display_name}\n"
+            f"ID: {user.id}\n"
+            f"Bot: {user.bot}"
+        )
+    ```
+  </Step>
+
+  <Step title="Run your bot">
+    ```python
+    @bot.event
+    async def on_ready():
+        print(f"Bot ready! Logged in as {bot.user.username}")
+
+    if __name__ == "__main__":
+        bot.run("your_bot_token")
+    ```
+  </Step>
+</Steps>
+
+## Command Processing
+
+The bot processes commands through the `_process_commands` method (client.py:663-688):
+
+1. Checks if the message author is a bot (ignores bot messages)
+2. Checks if the message starts with the command prefix
+3. Parses the command name and arguments
+4. Looks up the registered command handler
+5. Invokes the handler with parsed arguments
+
+<Note>
+Commands are sorted by length in reverse order, so longer command names are matched first. This prevents conflicts like `ban` matching before `banner`.
+</Note>
+
+## Custom Command Prefix
+
+You can customize the command prefix when creating your bot:
+
+```python
+bot = fluxer.Bot(command_prefix="?")  # Use ? instead of !
+```
+
+<Tip>
+Choose a prefix that doesn't conflict with other bots your users might have. Common prefixes include `!`, `?`, `$`, and `.`
+</Tip>

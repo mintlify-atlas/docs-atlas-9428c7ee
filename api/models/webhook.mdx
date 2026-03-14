@@ -1,0 +1,404 @@
+---
+title: Webhook
+description: Represents a Fluxer webhook
+---
+
+## Overview
+
+The `Webhook` class represents a Fluxer webhook, which allows sending messages to channels without a bot user. Webhooks are useful for integrations, notifications, and automated messages.
+
+## Class Definition
+
+```python
+from fluxer.models import Webhook
+
+@dataclass(slots=True)
+class Webhook:
+    """Represents a Fluxer webhook."""
+```
+
+## Properties
+
+<ResponseField name="id" type="int" required>
+  The unique snowflake ID of the webhook
+</ResponseField>
+
+<ResponseField name="guild_id" type="int" required>
+  The guild ID this webhook belongs to
+</ResponseField>
+
+<ResponseField name="channel_id" type="int" required>
+  The channel ID this webhook posts to
+</ResponseField>
+
+<ResponseField name="user" type="User" required>
+  The user that created the webhook
+</ResponseField>
+
+<ResponseField name="name" type="str" required>
+  The default name of the webhook
+</ResponseField>
+
+<ResponseField name="avatar" type="str | None">
+  The default avatar hash of the webhook
+</ResponseField>
+
+<ResponseField name="token" type="str" required>
+  The secure token for the webhook (used for executing)
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    *,
+    guild_id: int | None = None,
+) -> Webhook
+```
+
+Construct a Webhook instance from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw webhook object from the API
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTP client for making requests
+</ParamField>
+
+<ParamField path="guild_id" type="int | None">
+  Override guild_id if not present in data
+</ParamField>
+
+### edit
+
+```python
+async def edit(
+    *,
+    name: str | None = None,
+    avatar: str | None = None,
+    channel_id: int | None = None,
+) -> Webhook
+```
+
+Edit this webhook.
+
+<ParamField path="name" type="str | None">
+  New webhook name
+</ParamField>
+
+<ParamField path="avatar" type="str | None">
+  New avatar (base64 data URI)
+</ParamField>
+
+<ParamField path="channel_id" type="int | None">
+  Move webhook to a different channel
+</ParamField>
+
+**Returns:** The updated `Webhook` object
+
+**Example:**
+```python
+# Change webhook name
+webhook = await webhook.edit(name="New Webhook Name")
+
+# Move to different channel
+webhook = await webhook.edit(channel_id=987654321)
+```
+
+### send
+
+```python
+async def send(
+    content: str | None = None,
+    *,
+    embeds: list[dict[str, Any]] | None = None,
+    username: str | None = None,
+    avatar_url: str | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    wait: bool = False,
+) -> Message | None
+```
+
+Send a message with this webhook.
+
+<ParamField path="content" type="str | None">
+  Text content of the message
+</ParamField>
+
+<ParamField path="embeds" type="list[dict[str, Any]] | None">
+  List of embed dicts to include
+</ParamField>
+
+<ParamField path="username" type="str | None">
+  Override the webhook's default name
+</ParamField>
+
+<ParamField path="avatar_url" type="str | None">
+  Override the webhook's default avatar
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach
+</ParamField>
+
+<ParamField path="wait" type="bool" default="False">
+  If True, returns the created Message
+</ParamField>
+
+**Returns:** The created `Message` if `wait=True`, otherwise None
+
+**Examples:**
+```python
+# Simple message
+await webhook.send("Hello from webhook!")
+
+# Custom username and avatar
+await webhook.send(
+    "Custom message",
+    username="Custom Bot",
+    avatar_url="https://example.com/avatar.png"
+)
+
+# With embed
+from fluxer import Embed
+embed = Embed(title="Notification", description="Something happened!")
+await webhook.send(embeds=[embed.to_dict()])
+
+# With file
+from fluxer import File
+await webhook.send(
+    "Here's a file",
+    file=File("document.pdf")
+)
+
+# Wait for message response
+message = await webhook.send("Test", wait=True)
+print(f"Message ID: {message.id}")
+```
+
+### delete
+
+```python
+async def delete(*, reason: str | None = None) -> None
+```
+
+Delete this webhook.
+
+<ParamField path="reason" type="str | None">
+  Reason for deletion (shows in audit log)
+</ParamField>
+
+**Example:**
+```python
+await webhook.delete(reason="No longer needed")
+```
+
+## Usage Examples
+
+### Creating and Using a Webhook
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_ready():
+    # Create a webhook in a channel
+    channel = await client.fetch_channel(123456789)
+    
+    # Note: You'd use the HTTP client to create a webhook
+    # webhook = await channel.create_webhook(name="My Webhook")
+    
+    # Send a message via webhook
+    await webhook.send(
+        "Hello from webhook!",
+        username="Notification Bot",
+        avatar_url="https://example.com/icon.png"
+    )
+
+client.run()
+```
+
+### GitHub-Style Notifications
+
+```python
+from fluxer import Embed
+import fluxer
+
+async def send_github_notification(webhook, repo, action, user):
+    """Send a GitHub-style webhook notification."""
+    
+    embed = Embed(
+        title=f"[{repo}] {action}",
+        description=f"Action performed by {user}",
+        color=0x238636  # GitHub green
+    )
+    
+    embed.set_author(
+        name=user,
+        icon_url="https://github.com/user.png"
+    )
+    
+    embed.add_field(
+        name="Repository",
+        value=repo,
+        inline=True
+    )
+    embed.add_field(
+        name="Action",
+        value=action,
+        inline=True
+    )
+    
+    await webhook.send(
+        embeds=[embed.to_dict()],
+        username="GitHub",
+        avatar_url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+    )
+
+# Usage
+await send_github_notification(
+    webhook,
+    repo="user/repo",
+    action="Push to main",
+    user="developer123"
+)
+```
+
+### Monitoring System
+
+```python
+from fluxer import Embed
+from datetime import datetime
+
+async def send_alert(webhook, level, message, details=None):
+    """Send a monitoring alert via webhook."""
+    
+    colors = {
+        "info": 0x5865F2,    # Blue
+        "warning": 0xFEE75C, # Yellow
+        "error": 0xED4245,   # Red
+        "success": 0x57F287  # Green
+    }
+    
+    embed = Embed(
+        title=f"{level.upper()}: {message}",
+        description=details or "No additional details",
+        color=colors.get(level, 0x99AAB5),
+        timestamp=datetime.utcnow().isoformat()
+    )
+    
+    embed.set_footer(text="Monitoring System")
+    
+    await webhook.send(
+        embeds=[embed.to_dict()],
+        username="Monitor Bot"
+    )
+
+# Usage
+await send_alert(
+    webhook,
+    level="error",
+    message="High CPU Usage",
+    details="CPU usage exceeded 90% for 5 minutes"
+)
+```
+
+### RSS Feed Bot
+
+```python
+from fluxer import Embed
+
+async def post_rss_item(webhook, title, link, description, author):
+    """Post an RSS feed item to a channel via webhook."""
+    
+    embed = Embed(
+        title=title,
+        url=link,
+        description=description[:2000],  # Truncate if needed
+        color=0xFF6600  # RSS orange
+    )
+    
+    embed.set_author(name=author)
+    embed.set_footer(text="RSS Feed")
+    
+    await webhook.send(
+        embeds=[embed.to_dict()],
+        username="RSS Bot",
+        avatar_url="https://example.com/rss-icon.png"
+    )
+
+# Usage
+await post_rss_item(
+    webhook,
+    title="New Blog Post",
+    link="https://blog.example.com/post",
+    description="Check out our latest article...",
+    author="Blog Author"
+)
+```
+
+### Webhook Management
+
+```python
+import fluxer
+
+client = fluxer.Client(token="your_token")
+
+@client.event
+async def on_message(message):
+    if message.content == "!webhook create":
+        # Get webhooks for the channel (via HTTP client)
+        # webhook = await client.http.create_webhook(
+        #     message.channel_id,
+        #     name="Auto Webhook"
+        # )
+        
+        await message.reply(f"Created webhook: {webhook.name}")
+    
+    elif message.content == "!webhook list":
+        # List all webhooks in the channel
+        # webhooks = await client.http.get_channel_webhooks(message.channel_id)
+        
+        webhook_list = "\n".join(
+            [f"- {w.name} (ID: {w.id})" for w in webhooks]
+        )
+        await message.reply(f"Webhooks:\n{webhook_list}")
+    
+    elif message.content.startswith("!webhook delete"):
+        parts = message.content.split()
+        if len(parts) >= 3:
+            webhook_id = int(parts[2])
+            # webhook = await client.http.get_webhook(webhook_id)
+            await webhook.delete(reason="User requested deletion")
+            await message.reply("Webhook deleted!")
+
+client.run()
+```
+
+## Security Notes
+
+- **Keep webhook tokens secret**: Anyone with the webhook URL and token can send messages
+- **Use HTTPS**: Always use secure connections when sending webhook data
+- **Validate inputs**: If accepting user input for webhook messages, sanitize and validate it
+- **Rate limits**: Webhooks are subject to rate limits (check Fluxer API documentation)
+
+## Related Models
+
+- [Message](/api/models/message) - Webhooks send messages
+- [Channel](/api/models/channel) - Webhooks are tied to channels
+- [User](/api/models/user) - Webhooks have a creator user
+- [Embed](/api/models/embed) - Webhooks can send rich embeds

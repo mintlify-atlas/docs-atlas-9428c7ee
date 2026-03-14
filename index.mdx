@@ -1,97 +1,103 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "A Python API wrapper for Fluxer with async-first design, event-driven architecture, and command framework for building bots."
 ---
 
-## Setting up
+## Welcome to fluxer.py
 
-Get your documentation site up and running in minutes.
+Build powerful Fluxer bots with a clean, type-safe, and event-driven Python library. Whether you're creating simple command bots or complex applications with voice support, fluxer.py provides everything you need.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Get your first bot running in minutes
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Installation"
+    icon="download"
+    href="/installation"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Install fluxer.py with pip or uv
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
+    title="API Reference"
     icon="code"
-    href="/essentials/code"
+    href="/api/client"
   >
-    Add sample code to demonstrate how to use your product.
+    Explore the complete API documentation
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="Examples"
+    icon="lightbulb"
+    href="/examples/basic-bot"
   >
-    Display images and other media.
+    Learn from real-world examples
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Async-First Design" icon="bolt">
+    Built on asyncio for high-performance concurrent operations
   </Card>
-</Columns>
+  <Card title="REST API Support" icon="globe">
+    Automatic rate limiting and retry logic for API calls
+  </Card>
+  <Card title="WebSocket Gateway" icon="wifi">
+    Real-time events through WebSocket connection
+  </Card>
+  <Card title="Command Framework" icon="terminal">
+    Decorator-based commands with built-in parsing
+  </Card>
+  <Card title="Modular Cogs" icon="puzzle-piece">
+    Organize commands into reusable modules
+  </Card>
+  <Card title="Strongly Typed" icon="shield-check">
+    Full type hints for better IDE support
+  </Card>
+  <Card title="Voice Support" icon="microphone">
+    Optional voice capabilities with LiveKit
+  </Card>
+  <Card title="Event System" icon="bell">
+    Subscribe to gateway events with intents
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Quick Example
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+if __name__ == "__main__":
+    bot.run("your_bot_token")
+```
+
+## Get Started
+
+<Steps>
+  <Step title="Install the library">
+    ```bash
+    pip install fluxer.py
+    ```
+  </Step>
+  <Step title="Create your bot">
+    Follow the [quickstart guide](/quickstart) to create your first bot
+  </Step>
+  <Step title="Explore features">
+    Learn about [commands](/guides/commands), [cogs](/guides/cogs), and [voice](/guides/voice)
+  </Step>
+</Steps>

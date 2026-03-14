@@ -1,0 +1,531 @@
+---
+title: Intents
+description: Understanding and configuring gateway intents in fluxer.py
+---
+
+## What Are Intents?
+
+Intents are bit flags that tell the Fluxer gateway which events your bot wants to receive. They allow you to subscribe only to the events you need, reducing bandwidth and improving performance.
+
+From `fluxer/enums.py:33-40`:
+
+```python
+class Intents(enum.IntFlag):
+    """Gateway intents control which events your bot receives.
+
+    Usage:
+        intents = Intents.GUILDS | Intents.GUILD_MESSAGES
+        intents = Intents.default()
+        intents = Intents.all()
+    """
+```
+
+<Note>
+Intents are required when connecting to the gateway. If you don't specify intents, `Intents.default()` is used automatically.
+</Note>
+
+## Available Intents
+
+From `fluxer/enums.py:42-57`, here are all available intents:
+
+```python
+class Intents(enum.IntFlag):
+    GUILDS = 1 << 0
+    GUILD_MEMBERS = 1 << 1                # Privileged
+    GUILD_MODERATION = 1 << 2
+    GUILD_EMOJIS_AND_STICKERS = 1 << 3
+    GUILD_INTEGRATIONS = 1 << 4
+    GUILD_WEBHOOKS = 1 << 5
+    GUILD_INVITES = 1 << 6
+    GUILD_VOICE_STATES = 1 << 7
+    GUILD_PRESENCES = 1 << 8              # Privileged
+    GUILD_MESSAGES = 1 << 9
+    GUILD_MESSAGE_REACTIONS = 1 << 10
+    GUILD_MESSAGE_TYPING = 1 << 11
+    DIRECT_MESSAGES = 1 << 12
+    DIRECT_MESSAGE_REACTIONS = 1 << 13
+    DIRECT_MESSAGE_TYPING = 1 << 14
+    MESSAGE_CONTENT = 1 << 15             # Privileged
+```
+
+### Intent Descriptions
+
+<Accordion title="GUILDS">
+
+**Events**: `GUILD_CREATE`, `GUILD_UPDATE`, `GUILD_DELETE`, `GUILD_ROLE_CREATE`, `GUILD_ROLE_UPDATE`, `GUILD_ROLE_DELETE`, `CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`
+
+Core guild events. Almost all bots need this intent.
+
+```python
+intents = Intents.GUILDS
+```
+
+</Accordion>
+
+<Accordion title="GUILD_MEMBERS (Privileged)">
+
+**Events**: `GUILD_MEMBER_ADD`, `GUILD_MEMBER_UPDATE`, `GUILD_MEMBER_REMOVE`
+
+Member join/leave events and member list.
+
+```python
+intents = Intents.GUILD_MEMBERS
+```
+
+<Warning>
+This is a privileged intent. You must enable it in your bot's dashboard.
+</Warning>
+
+</Accordion>
+
+<Accordion title="GUILD_MODERATION">
+
+**Events**: Ban and unban events
+
+For moderation bots that need to track bans.
+
+```python
+intents = Intents.GUILD_MODERATION
+```
+
+</Accordion>
+
+<Accordion title="GUILD_EMOJIS_AND_STICKERS">
+
+**Events**: `GUILD_EMOJIS_UPDATE`, `GUILD_STICKERS_UPDATE`
+
+Emoji and sticker changes in guilds.
+
+```python
+intents = Intents.GUILD_EMOJIS_AND_STICKERS
+```
+
+</Accordion>
+
+<Accordion title="GUILD_VOICE_STATES">
+
+**Events**: `VOICE_STATE_UPDATE`
+
+Voice channel join/leave/move events. Required for voice bots.
+
+```python
+intents = Intents.GUILD_VOICE_STATES
+```
+
+</Accordion>
+
+<Accordion title="GUILD_PRESENCES (Privileged)">
+
+**Events**: `PRESENCE_UPDATE`
+
+User presence changes (online, offline, idle, etc.).
+
+```python
+intents = Intents.GUILD_PRESENCES
+```
+
+<Warning>
+This is a privileged intent. You must enable it in your bot's dashboard.
+</Warning>
+
+</Accordion>
+
+<Accordion title="GUILD_MESSAGES">
+
+**Events**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE` in guilds
+
+Guild message events. Most bots need this.
+
+```python
+intents = Intents.GUILD_MESSAGES
+```
+
+</Accordion>
+
+<Accordion title="GUILD_MESSAGE_REACTIONS">
+
+**Events**: `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`, `MESSAGE_REACTION_REMOVE_ALL`
+
+Reaction events in guilds.
+
+```python
+intents = Intents.GUILD_MESSAGE_REACTIONS
+```
+
+</Accordion>
+
+<Accordion title="DIRECT_MESSAGES">
+
+**Events**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE` in DMs
+
+Direct message events.
+
+```python
+intents = Intents.DIRECT_MESSAGES
+```
+
+</Accordion>
+
+<Accordion title="MESSAGE_CONTENT (Privileged)">
+
+**Provides**: Access to `message.content`, `message.embeds`, `message.attachments`, `message.components`
+
+Allows reading message content. Without this, you only get message metadata.
+
+```python
+intents = Intents.MESSAGE_CONTENT
+```
+
+<Warning>
+This is a privileged intent. Required for prefix commands and reading message content.
+</Warning>
+
+</Accordion>
+
+## Privileged Intents
+
+Three intents are considered "privileged" and require explicit approval:
+
+1. **GUILD_MEMBERS** - Member list and join/leave events
+2. **GUILD_PRESENCES** - User presence/status updates
+3. **MESSAGE_CONTENT** - Message content and attachments
+
+<Warning>
+To use privileged intents, you must:
+1. Enable them in the Fluxer bot developer portal
+2. For bots in 100+ servers, you may need to request approval
+</Warning>
+
+## Intent Helpers
+
+fluxer.py provides three helper methods for common intent configurations:
+
+### Intents.default()
+
+From `fluxer/enums.py:59-70`, returns sensible defaults (excludes privileged intents):
+
+```python
+@classmethod
+def default(cls) -> Intents:
+    """Returns a sensible default set of intents (excludes privileged ones)."""
+    value = cls(0)
+    for intent in cls:
+        if intent not in (
+            cls.GUILD_MEMBERS,
+            cls.GUILD_PRESENCES,
+            cls.MESSAGE_CONTENT,
+        ):
+            value |= intent
+    return value
+```
+
+**Usage**:
+
+```python
+from fluxer import Bot, Intents
+
+# Use default intents (recommended for most bots)
+bot = Bot(command_prefix="!", intents=Intents.default())
+```
+
+<Note>
+`Intents.default()` is the default value if you don't specify intents.
+</Note>
+
+### Intents.all()
+
+From `fluxer/enums.py:72-78`, returns all intents enabled:
+
+```python
+@classmethod
+def all(cls) -> Intents:
+    """Returns all intents enabled."""
+    value = cls(0)
+    for intent in cls:
+        value |= intent
+    return value
+```
+
+**Usage**:
+
+```python
+# Enable all intents (requires privileged intents enabled)
+bot = Bot(command_prefix="!", intents=Intents.all())
+```
+
+<Warning>
+Only use `Intents.all()` if you've enabled all privileged intents in your bot's dashboard. Otherwise, the connection will fail.
+</Warning>
+
+### Intents.none()
+
+From `fluxer/enums.py:80-83`, returns no intents:
+
+```python
+@classmethod
+def none(cls) -> Intents:
+    """Returns no intents."""
+    return cls(0)
+```
+
+**Usage**:
+
+```python
+# No intents (only useful for specific edge cases)
+intents = Intents.none()
+```
+
+## Combining Intents
+
+Intents use bitwise operations to combine multiple flags:
+
+### Using the | Operator
+
+```python
+from fluxer import Intents
+
+# Combine multiple intents
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.MESSAGE_CONTENT
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+### Adding to Default Intents
+
+```python
+# Start with defaults and add privileged intents
+intents = Intents.default()
+intents |= Intents.MESSAGE_CONTENT  # Add message content
+intents |= Intents.GUILD_MEMBERS     # Add member tracking
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+### Removing from All Intents
+
+```python
+# All intents except presences
+intents = Intents.all()
+intents &= ~Intents.GUILD_PRESENCES  # Remove presences
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+## Common Intent Patterns
+
+<CodeGroup>
+
+```python Basic Message Bot
+from fluxer import Bot, Intents
+
+# For a bot that only reads and responds to messages
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.MESSAGE_CONTENT
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+```python Moderation Bot
+from fluxer import Bot, Intents
+
+# For a moderation bot that needs member info
+intents = (
+    Intents.GUILDS
+    | Intents.GUILD_MESSAGES
+    | Intents.MESSAGE_CONTENT
+    | Intents.GUILD_MEMBERS      # Privileged
+    | Intents.GUILD_MODERATION
+)
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+```python Voice Bot
+from fluxer import Bot, Intents
+
+# For a music/voice bot
+intents = (
+    Intents.GUILDS
+    | Intents.GUILD_MESSAGES
+    | Intents.MESSAGE_CONTENT
+    | Intents.GUILD_VOICE_STATES  # Required for voice
+)
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+```python DM Bot
+from fluxer import Bot, Intents
+
+# For a bot that primarily uses DMs
+intents = (
+    Intents.GUILDS
+    | Intents.DIRECT_MESSAGES
+    | Intents.MESSAGE_CONTENT
+)
+
+bot = Bot(command_prefix="!", intents=intents)
+```
+
+</CodeGroup>
+
+## Checking Intents
+
+You can check if specific intents are enabled:
+
+```python
+intents = Intents.default()
+
+# Check if a specific intent is enabled
+if Intents.GUILD_MEMBERS in intents:
+    print("Member tracking enabled")
+
+# Check using bitwise AND
+if intents & Intents.MESSAGE_CONTENT:
+    print("Can read message content")
+
+# Get the integer value (for debugging)
+print(f"Intent value: {int(intents)}")
+```
+
+## Why Intents Matter for Your Bot
+
+<CardGroup cols={2}>
+
+<Card title="Performance" icon="gauge">
+  Only receive events you actually use, reducing bandwidth and processing
+</Card>
+
+<Card title="Privacy" icon="shield">
+  Request only the data your bot needs, respecting user privacy
+</Card>
+
+<Card title="Compliance" icon="scale-balanced">
+  Required for bots in 100+ servers to prevent abuse
+</Card>
+
+<Card title="Debugging" icon="bug">
+  If events aren't firing, check if you have the required intent
+</Card>
+
+</CardGroup>
+
+## Intent Errors
+
+From `fluxer/enums.py:91-108`, the gateway will close with specific error codes if intents are invalid:
+
+```python
+class GatewayCloseCode(enum.IntEnum):
+    INVALID_INTENTS = 4013      # Intent value is invalid
+    DISALLOWED_INTENTS = 4014   # Privileged intent not enabled
+```
+
+### Common Errors
+
+**INVALID_INTENTS (4013)**: You sent an invalid intent value
+- Solution: Make sure you're using valid intent flags
+
+**DISALLOWED_INTENTS (4014)**: You requested a privileged intent that isn't enabled
+- Solution: Enable the privileged intent in your bot's developer portal
+
+<Warning>
+From `fluxer/enums.py:110-120`, these close codes are NOT reconnectable. Fix your intents and restart your bot.
+</Warning>
+
+## Example: Minimal Bot
+
+```python
+from fluxer import Bot, Intents
+
+# Minimal intents for a command bot
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.MESSAGE_CONTENT
+
+bot = Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"Ready! Using intents: {int(bot.intents)}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+bot.run("YOUR_TOKEN")
+```
+
+## Troubleshooting
+
+### My bot doesn't receive messages
+
+<Accordion title="Solution">
+
+Make sure you have both `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents:
+
+```python
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.MESSAGE_CONTENT
+```
+
+And enable MESSAGE_CONTENT in your bot's dashboard (it's privileged).
+
+</Accordion>
+
+### My bot can't see member joins
+
+<Accordion title="Solution">
+
+You need the `GUILD_MEMBERS` privileged intent:
+
+```python
+intents = Intents.default() | Intents.GUILD_MEMBERS
+```
+
+And enable GUILD_MEMBERS in your bot's dashboard.
+
+</Accordion>
+
+### My voice bot doesn't work
+
+<Accordion title="Solution">
+
+Voice bots need the `GUILD_VOICE_STATES` intent:
+
+```python
+intents = Intents.GUILDS | Intents.GUILD_VOICE_STATES
+```
+
+</Accordion>
+
+### message.content is always empty
+
+<Accordion title="Solution">
+
+You need the `MESSAGE_CONTENT` privileged intent:
+
+```python
+intents = Intents.default() | Intents.MESSAGE_CONTENT
+```
+
+Without this intent, you can only access message metadata (author, channel, timestamp, etc.).
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Events" icon="bolt" href="/concepts/events">
+  Learn which events require which intents
+</Card>
+
+<Card title="Client vs Bot" icon="robot" href="/concepts/client-vs-bot">
+  Configure intents when creating your bot
+</Card>
+
+<Card title="Gateway" icon="plug" href="/api/gateway">
+  Understand how the gateway uses intents
+</Card>
+
+<Card title="Error Handling" icon="triangle-exclamation" href="/concepts/error-handling">
+  Handle intent-related errors
+</Card>
+
+</CardGroup>

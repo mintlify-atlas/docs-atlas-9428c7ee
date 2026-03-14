@@ -1,0 +1,170 @@
+---
+title: Gateway Enums
+description: Gateway opcodes and close codes for the Fluxer WebSocket connection
+---
+
+## Overview
+
+The gateway enums define the protocol for WebSocket communication between your bot and the Fluxer gateway. Fluxer mirrors Discord's gateway structure for wire compatibility.
+
+## GatewayOpcode
+
+Gateway opcodes define the type of payload being sent or received over the WebSocket connection.
+
+```python
+from fluxer.enums import GatewayOpcode
+```
+
+### Opcode Values
+
+| Opcode | Value | Direction | Description |
+|--------|-------|-----------|-------------|
+| `DISPATCH` | `0` | Server → Client | An event was dispatched |
+| `HEARTBEAT` | `1` | Bidirectional | Maintain connection / request heartbeat |
+| `IDENTIFY` | `2` | Client → Server | Start a new session |
+| `PRESENCE_UPDATE` | `3` | Client → Server | Update client presence/status |
+| `VOICE_STATE_UPDATE` | `4` | Client → Server | Join/move/leave voice channels |
+| `RESUME` | `6` | Client → Server | Resume a dropped connection |
+| `RECONNECT` | `7` | Server → Client | Client should reconnect |
+| `REQUEST_GUILD_MEMBERS` | `8` | Client → Server | Request guild member list |
+| `INVALID_SESSION` | `9` | Server → Client | Session is invalid |
+| `HELLO` | `10` | Server → Client | Sent on connect, contains heartbeat_interval |
+| `HEARTBEAT_ACK` | `11` | Server → Client | Acknowledgement of heartbeat |
+
+### Usage Example
+
+```python
+from fluxer.enums import GatewayOpcode
+
+# These are typically used internally by the library
+# but you may need them for custom gateway handling
+
+if opcode == GatewayOpcode.DISPATCH:
+    # Handle event dispatch
+    handle_event(payload)
+elif opcode == GatewayOpcode.HEARTBEAT:
+    # Send heartbeat
+    await send_heartbeat()
+elif opcode == GatewayOpcode.RECONNECT:
+    # Reconnect to gateway
+    await reconnect()
+```
+
+## GatewayCloseCode
+
+WebSocket close codes that the Fluxer gateway may send when closing the connection.
+
+```python
+from fluxer.enums import GatewayCloseCode
+```
+
+### Close Code Values
+
+| Close Code | Value | Reconnectable | Description |
+|------------|-------|---------------|-------------|
+| `UNKNOWN_ERROR` | `4000` | Yes | Unknown error occurred |
+| `UNKNOWN_OPCODE` | `4001` | Yes | Invalid opcode sent |
+| `DECODE_ERROR` | `4002` | Yes | Invalid payload sent |
+| `NOT_AUTHENTICATED` | `4003` | Yes | Sent payload before identifying |
+| `AUTHENTICATION_FAILED` | `4004` | No | Invalid token |
+| `ALREADY_AUTHENTICATED` | `4005` | Yes | Already authenticated |
+| `INVALID_SEQ` | `4007` | Yes | Invalid sequence number |
+| `RATE_LIMITED` | `4008` | Yes | Sending payloads too quickly |
+| `SESSION_TIMED_OUT` | `4009` | Yes | Session timed out |
+| `INVALID_SHARD` | `4010` | No | Invalid shard ID |
+| `SHARDING_REQUIRED` | `4011` | No | Session requires sharding |
+| `INVALID_API_VERSION` | `4012` | No | Invalid API version |
+| `INVALID_INTENTS` | `4013` | No | Invalid intents provided |
+| `DISALLOWED_INTENTS` | `4014` | No | Privileged intents not enabled |
+
+### is_reconnectable Property
+
+Check if the bot should attempt to reconnect after a close code:
+
+```python
+from fluxer.enums import GatewayCloseCode
+
+close_code = GatewayCloseCode.SESSION_TIMED_OUT
+
+if close_code.is_reconnectable:
+    print("Should attempt to reconnect")
+else:
+    print("Cannot reconnect - fatal error")
+```
+
+#### Non-Reconnectable Close Codes
+
+These close codes indicate fatal errors that cannot be resolved by reconnecting:
+- `AUTHENTICATION_FAILED` - Invalid token
+- `INVALID_SHARD` - Wrong shard configuration
+- `SHARDING_REQUIRED` - Bot needs to use sharding
+- `INVALID_API_VERSION` - Unsupported API version
+- `INVALID_INTENTS` - Invalid intent values
+- `DISALLOWED_INTENTS` - Privileged intents not enabled
+
+### Usage Example
+
+```python
+from fluxer.enums import GatewayCloseCode
+
+async def handle_disconnect(close_code: int):
+    try:
+        code = GatewayCloseCode(close_code)
+    except ValueError:
+        # Not a known Fluxer close code
+        print(f"Unknown close code: {close_code}")
+        return
+    
+    if code == GatewayCloseCode.AUTHENTICATION_FAILED:
+        print("Invalid token - check your bot credentials")
+        return
+    elif code == GatewayCloseCode.DISALLOWED_INTENTS:
+        print("Enable privileged intents in the developer portal")
+        return
+    elif code == GatewayCloseCode.SHARDING_REQUIRED:
+        print("Your bot is in too many guilds and requires sharding")
+        return
+    
+    if code.is_reconnectable:
+        print(f"Reconnecting after {code.name}...")
+        await reconnect()
+    else:
+        print(f"Fatal error: {code.name} - cannot reconnect")
+```
+
+## Gateway Connection Flow
+
+### Initial Connection
+
+1. Client connects to WebSocket
+2. Server sends `HELLO` (opcode 10) with heartbeat interval
+3. Client sends `IDENTIFY` (opcode 2) with token and intents
+4. Server sends `DISPATCH` (opcode 0) events
+
+### Heartbeat
+
+1. Client sends `HEARTBEAT` (opcode 1) at the specified interval
+2. Server responds with `HEARTBEAT_ACK` (opcode 11)
+3. If no ACK received, client should reconnect
+
+### Resume
+
+1. If connection drops, client can attempt to resume
+2. Client sends `RESUME` (opcode 6) with session info
+3. Server replays missed events or sends `INVALID_SESSION`
+
+<Note>
+The fluxer.py library handles all gateway operations automatically. You typically don't need to work with these enums directly unless implementing custom gateway handling.
+</Note>
+
+## Best Practices
+
+<Tip>
+- Always check `is_reconnectable` before attempting to reconnect
+- Log gateway close codes for debugging connection issues
+- Handle `AUTHENTICATION_FAILED` by prompting for a new token
+</Tip>
+
+<Warning>
+Never hardcode a reconnect loop for non-reconnectable close codes. This can result in your bot being rate limited or banned.
+</Warning>

@@ -1,0 +1,634 @@
+---
+title: Error Handling
+description: Understanding and handling exceptions in fluxer.py
+---
+
+## Overview
+
+fluxer.py provides a comprehensive exception hierarchy to help you handle errors gracefully. All exceptions inherit from `FluxerException`, making it easy to catch library-specific errors.
+
+## Exception Hierarchy
+
+From `fluxer/errors.py:6-8`:
+
+```python
+class FluxerException(Exception):
+    """Base exception for all fluxer.py errors."""
+```
+
+All fluxer.py exceptions inherit from `FluxerException`, which allows you to catch all library errors:
+
+```python
+try:
+    await channel.send("Hello!")
+except FluxerException as e:
+    print(f"A fluxer.py error occurred: {e}")
+```
+
+## HTTP Exceptions
+
+HTTP exceptions are raised when API requests fail.
+
+### Base HTTPException
+
+From `fluxer/errors.py:15-29`:
+
+```python
+class HTTPException(FluxerException):
+    """Raised when an HTTP request to the Fluxer API fails."""
+
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        errors: list[dict[str, Any]] | None = None,
+    ):
+        self.status = status
+        self.code = code
+        self.message = message
+        self.errors = errors or []
+        super().__init__(f"{status} {code}: {message}")
+```
+
+**Attributes**:
+- `status` (int) - HTTP status code (400, 403, 404, etc.)
+- `code` (str) - Fluxer error code
+- `message` (str) - Human-readable error message
+- `errors` (list) - Additional error details (for validation errors)
+
+### BadRequest (400)
+
+From `fluxer/errors.py:32-33`:
+
+```python
+class BadRequest(HTTPException):
+    """400 Bad Request — invalid input."""
+```
+
+Raised when you send invalid data to the API.
+
+**Example**:
+
+```python
+try:
+    await channel.send("")  # Empty message
+except BadRequest as e:
+    print(f"Invalid request: {e.message}")
+    # Check validation errors
+    for error in e.errors:
+        print(f"  - {error}")
+```
+
+<Accordion title="Common Causes">
+
+- Empty message content
+- Invalid snowflake IDs
+- Message content exceeds 2000 characters
+- Invalid embed structure
+- Missing required fields
+
+</Accordion>
+
+### Unauthorized (401)
+
+From `fluxer/errors.py:36-37`:
+
+```python
+class Unauthorized(HTTPException):
+    """401 Unauthorized — bad or missing token."""
+```
+
+Raised when your bot token is invalid or missing.
+
+**Example**:
+
+```python
+try:
+    bot.run("invalid_token")
+except Unauthorized:
+    print("Invalid bot token! Check your credentials.")
+```
+
+<Warning>
+If you get this error, verify your token is correct and hasn't been regenerated.
+</Warning>
+
+### Forbidden (403)
+
+From `fluxer/errors.py:40-41`:
+
+```python
+class Forbidden(HTTPException):
+    """403 Forbidden — missing permissions."""
+```
+
+Raised when your bot lacks permissions to perform an action.
+
+**Example**:
+
+```python
+try:
+    await message.delete()
+except Forbidden:
+    await message.reply("I don't have permission to delete messages!")
+```
+
+<Accordion title="Common Causes">
+
+- Bot missing channel permissions (SEND_MESSAGES, MANAGE_MESSAGES, etc.)
+- Bot role is lower than the target user's role
+- Bot trying to modify the guild owner
+- Channel is read-only for the bot
+
+</Accordion>
+
+### NotFound (404)
+
+From `fluxer/errors.py:44-45`:
+
+```python
+class NotFound(HTTPException):
+    """404 Not Found — resource doesn't exist."""
+```
+
+Raised when the requested resource doesn't exist.
+
+**Example**:
+
+```python
+try:
+    message = await bot.fetch_message(channel_id, "invalid_id")
+except NotFound:
+    print("Message not found (may have been deleted)")
+```
+
+<Accordion title="Common Causes">
+
+- Message was deleted
+- Channel was deleted
+- Invalid ID (typo or wrong resource type)
+- Bot doesn't have access to the resource
+
+</Accordion>
+
+### RateLimited (429)
+
+From `fluxer/errors.py:48-57`:
+
+```python
+class RateLimited(HTTPException):
+    """429 Too Many Requests — slow down."""
+
+    def __init__(self, retry_after: float, **kwargs: Any):
+        self.retry_after = retry_after
+        super().__init__(
+            status=429,
+            code="RATE_LIMITED",
+            message=f"Rate limited, retry after {retry_after}s",
+        )
+```
+
+**Attributes**:
+- `retry_after` (float) - Seconds to wait before retrying
+
+Raised when you exceed API rate limits.
+
+**Example**:
+
+```python
+import asyncio
+
+try:
+    await channel.send("Hello!")
+except RateLimited as e:
+    print(f"Rate limited! Waiting {e.retry_after} seconds...")
+    await asyncio.sleep(e.retry_after)
+    await channel.send("Hello!")  # Retry
+```
+
+<Note>
+fluxer.py automatically handles rate limits internally, so you should rarely see this exception. It's only raised if you exceed global rate limits or disable automatic handling.
+</Note>
+
+## Gateway Exceptions
+
+Gateway exceptions are raised during WebSocket connection issues.
+
+### GatewayException
+
+From `fluxer/errors.py:65-66`:
+
+```python
+class GatewayException(FluxerException):
+    """Base for gateway/WebSocket errors."""
+```
+
+### GatewayNotConnected
+
+From `fluxer/errors.py:69-70`:
+
+```python
+class GatewayNotConnected(GatewayException):
+    """Raised when trying to use the gateway before it's connected."""
+```
+
+Raised when you try to send gateway messages before connecting.
+
+**Example**:
+
+```python
+from fluxer import Client
+
+client = Client()
+
+try:
+    # This will fail - not connected yet
+    await client._gateway.update_presence(status="online")
+except GatewayNotConnected:
+    print("Connect to the gateway first!")
+```
+
+### ReconnectRequested
+
+From `fluxer/errors.py:73-74`:
+
+```python
+class ReconnectRequested(GatewayException):
+    """The gateway has requested we reconnect."""
+```
+
+Raised internally when the gateway sends a reconnect opcode.
+
+<Note>
+This is handled automatically by fluxer.py. You don't need to catch this exception.
+</Note>
+
+### SessionInvalid
+
+From `fluxer/errors.py:77-82`:
+
+```python
+class SessionInvalid(GatewayException):
+    """The session is invalid and cannot be resumed."""
+
+    def __init__(self, resumable: bool = False):
+        self.resumable = resumable
+        super().__init__(f"Invalid session (resumable={resumable})")
+```
+
+**Attributes**:
+- `resumable` (bool) - Whether the session can be resumed
+
+Raised when the gateway session becomes invalid.
+
+<Note>
+This is handled automatically by the reconnection logic.
+</Note>
+
+## Client Exceptions
+
+### LoginFailure
+
+From `fluxer/errors.py:90-91`:
+
+```python
+class LoginFailure(FluxerException):
+    """Raised when the bot token is invalid."""
+```
+
+Raised when authentication fails.
+
+**Example**:
+
+```python
+try:
+    bot.run("bad_token")
+except LoginFailure:
+    print("Failed to log in. Check your bot token.")
+```
+
+## Exception Factory
+
+From `fluxer/errors.py:94-111`, fluxer.py automatically maps HTTP status codes to the correct exception:
+
+```python
+# Map HTTP status codes to exception classes
+_STATUS_MAP: dict[int, type[HTTPException]] = {
+    400: BadRequest,
+    401: Unauthorized,
+    403: Forbidden,
+    404: NotFound,
+    429: RateLimited,
+}
+
+def http_exception_from_status(
+    status: int, code: str, message: str, **kwargs: Any
+) -> HTTPException:
+    """Factory to create the right HTTPException subclass for a status code."""
+    cls = _STATUS_MAP.get(status, HTTPException)
+    if cls is RateLimited:
+        return RateLimited(retry_after=kwargs.get("retry_after", 0.0))
+    return cls(status=status, code=code, message=message, errors=kwargs.get("errors"))
+```
+
+This means unknown status codes will raise a generic `HTTPException`.
+
+## Best Practices
+
+### 1. Catch Specific Exceptions
+
+```python
+# Good: Handle specific errors differently
+try:
+    await message.delete()
+except Forbidden:
+    await message.reply("I don't have permission to delete that message.")
+except NotFound:
+    await message.reply("That message doesn't exist anymore.")
+except HTTPException as e:
+    await message.reply(f"An error occurred: {e.message}")
+```
+
+```python
+# Bad: Catch all exceptions
+try:
+    await message.delete()
+except Exception:
+    pass  # What went wrong?
+```
+
+### 2. Use Error Details
+
+```python
+try:
+    await channel.send(invalid_data)
+except BadRequest as e:
+    print(f"Status: {e.status}")
+    print(f"Code: {e.code}")
+    print(f"Message: {e.message}")
+    for error in e.errors:
+        print(f"Validation error: {error}")
+```
+
+### 3. Implement Retry Logic
+
+```python
+import asyncio
+from fluxer import RateLimited, HTTPException
+
+async def send_with_retry(channel, content, max_retries=3):
+    """Send a message with automatic retry on rate limits."""
+    for attempt in range(max_retries):
+        try:
+            return await channel.send(content)
+        except RateLimited as e:
+            if attempt < max_retries - 1:
+                await asyncio.sleep(e.retry_after)
+            else:
+                raise
+        except HTTPException:
+            # Don't retry other HTTP errors
+            raise
+```
+
+### 4. Handle Errors in Event Handlers
+
+From `fluxer/client.py:311-318`, exceptions in event handlers are logged but don't crash your bot:
+
+```python
+@bot.event
+async def on_message(message):
+    try:
+        # Your message handling logic
+        if message.content.startswith("!process"):
+            result = await process_command(message)
+            await message.reply(result)
+    except Forbidden:
+        # Specific handling for permission errors
+        await message.author.send("I couldn't reply in that channel!")
+    except Exception as e:
+        # Log unexpected errors
+        import logging
+        logging.exception("Unexpected error in on_message")
+        await message.reply(f"An error occurred: {str(e)}")
+```
+
+<Warning>
+Always include error handling in your event handlers. Unhandled exceptions will be logged, but they won't crash your bot.
+</Warning>
+
+### 5. User-Friendly Error Messages
+
+```python
+@bot.command()
+async def ban(ctx, user_id: str, *, reason: str = "No reason provided"):
+    try:
+        # Assume we have a ban function
+        await ctx.guild.ban(user_id, reason=reason)
+        await ctx.reply(f"✅ Banned user {user_id}")
+    except Forbidden:
+        await ctx.reply("❌ I don't have permission to ban members.")
+    except NotFound:
+        await ctx.reply("❌ User not found.")
+    except BadRequest as e:
+        await ctx.reply(f"❌ Invalid request: {e.message}")
+    except HTTPException as e:
+        await ctx.reply(f"❌ An error occurred: {e.message}")
+```
+
+## Common Error Patterns
+
+<CodeGroup>
+
+```python Permission Check
+async def safe_delete(message):
+    """Safely delete a message with error handling."""
+    try:
+        await message.delete()
+        return True
+    except Forbidden:
+        print("Missing permissions to delete message")
+        return False
+    except NotFound:
+        print("Message already deleted")
+        return False
+    except HTTPException as e:
+        print(f"Failed to delete message: {e}")
+        return False
+```
+
+```python Bulk Operations
+async def bulk_send(channel, messages):
+    """Send multiple messages with rate limit handling."""
+    sent = []
+    for content in messages:
+        try:
+            msg = await channel.send(content)
+            sent.append(msg)
+        except RateLimited as e:
+            await asyncio.sleep(e.retry_after)
+            msg = await channel.send(content)
+            sent.append(msg)
+        except Forbidden:
+            print(f"Can't send to {channel.name}")
+            break
+    return sent
+```
+
+```python Graceful Degradation
+@bot.event
+async def on_guild_join(guild):
+    """Welcome message with fallback channels."""
+    message = f"Thanks for adding me to {guild.name}!"
+    
+    # Try system channel first
+    if guild.system_channel:
+        try:
+            await guild.system_channel.send(message)
+            return
+        except Forbidden:
+            pass
+    
+    # Fallback to first available channel
+    for channel in guild.channels:
+        try:
+            await channel.send(message)
+            return
+        except (Forbidden, BadRequest):
+            continue
+    
+    print(f"Couldn't send welcome message in {guild.name}")
+```
+
+```python Validation
+async def validate_and_send(channel, content):
+    """Validate before sending to avoid BadRequest."""
+    # Pre-validate
+    if not content or len(content) > 2000:
+        raise ValueError("Content must be 1-2000 characters")
+    
+    try:
+        return await channel.send(content)
+    except BadRequest as e:
+        # Check error details for more info
+        print(f"Validation failed: {e.errors}")
+        raise
+```
+
+</CodeGroup>
+
+## Logging Errors
+
+fluxer.py uses Python's standard `logging` module:
+
+```python
+import logging
+
+# Enable debug logging for fluxer.py
+logging.basicConfig(level=logging.DEBUG)
+
+# Or configure specific loggers
+logging.getLogger('fluxer').setLevel(logging.INFO)
+logging.getLogger('fluxer.gateway').setLevel(logging.DEBUG)
+logging.getLogger('fluxer.http').setLevel(logging.WARNING)
+```
+
+### Custom Error Handler
+
+```python
+import logging
+from fluxer import Bot
+
+logger = logging.getLogger(__name__)
+bot = Bot(command_prefix="!")
+
+@bot.event
+async def on_ready():
+    logger.info(f"Bot ready: {bot.user}")
+
+@bot.event  
+async def on_message(message):
+    try:
+        # Your logic here
+        await process_message(message)
+    except Exception as e:
+        logger.exception(
+            "Error processing message",
+            extra={
+                "message_id": message.id,
+                "channel_id": message.channel_id,
+                "author_id": message.author.id,
+            }
+        )
+```
+
+## Debugging Tips
+
+<Accordion title="Enable Debug Logging">
+
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
+
+This will show all HTTP requests, gateway events, and error details.
+
+</Accordion>
+
+<Accordion title="Inspect Exception Attributes">
+
+```python
+try:
+    await channel.send("test")
+except HTTPException as e:
+    print(f"Status: {e.status}")
+    print(f"Code: {e.code}")
+    print(f"Message: {e.message}")
+    print(f"Errors: {e.errors}")
+    print(f"Full exception: {repr(e)}")
+```
+
+</Accordion>
+
+<Accordion title="Check Bot Permissions">
+
+```python
+@bot.command()
+async def checkperms(ctx):
+    """Check what permissions the bot has."""
+    if ctx.guild:
+        # Get bot member
+        bot_member = ctx.guild.get_member(bot.user.id)
+        if bot_member:
+            perms = bot_member.permissions
+            await ctx.reply(f"My permissions value: {perms}")
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Client vs Bot" icon="robot" href="/concepts/client-vs-bot">
+  Understand the client classes and their methods
+</Card>
+
+<Card title="Events" icon="bolt" href="/concepts/events">
+  Handle events and errors in event handlers
+</Card>
+
+<Card title="HTTP Client" icon="globe" href="/api/http-client">
+  Learn about the HTTP client and retry logic
+</Card>
+
+<Card title="Commands" icon="terminal" href="/guides/commands">
+  Build commands with proper error handling
+</Card>
+
+</CardGroup>
